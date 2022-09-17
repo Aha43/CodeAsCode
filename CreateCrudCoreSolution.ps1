@@ -256,7 +256,9 @@ function Add-Project-And-Push-Location {
         $ProjectFile = ($ProjectDir + ".csproj")
         if (-not (Test-Path -Path $ProjectFile -PathType Leaf))
         {
-            dotnet new $Type
+            $tmp = $StemNameSpace + '.' + $ProjectDir
+            dotnet new $Type -n $tmp -o '.'
+            Move-Item -Path ('.\' + $tmp + ".csproj") -Destination ('.\' + $ProjectDir + ".csproj")
 
             $xml = [xml](Get-Content $ProjectFile)
             
