@@ -6,11 +6,13 @@ $StemNameSpace = 'No.Super.Corp'
 $Types = Get-Content -Path "./Test/Types.txt"
 $Stack = Get-Content -Path "./Test/Stack.txt"
 
+$MakeRepositorySpec = ($Stack.Contains('application-web-api') -or $Stack.Contains('repository-sql'))
+
 #
 # Functions that generate intial code
 #
 
-function Get_Qualified_Namespace {
+function Get-Qualified-Namespace {
     param (
         $StemNameSpace,
         $LocalNameSpace
@@ -31,7 +33,7 @@ function Write-Dto-Interface {
         [Switch]$NoId
     )
 
-    $Ns = Get_Qualified_Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
+    $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
 
     $File = Join-Path -Path $Path -ChildPath ('I' + $Name + '.cs')
     if (-not (Test-Path -Path $File))
@@ -61,7 +63,7 @@ function Write-Dto-Class {
         [switch]$NoId
     )
 
-    $Ns = Get_Qualified_Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
+    $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
 
     $File = Join-Path -Path $Path -ChildPath ($Name + '.cs')
     if (-not (Test-Path -Path $File))
@@ -91,9 +93,10 @@ function Write-Dbo-Class {
         $Name
     )
 
-    $Ns = Get_Qualified_Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
-
     $File = Join-Path -Path $Path -ChildPath ($Name + '.cs')
+
+    $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
+
     if (-not (Test-Path -Path $File))
     {
         $t = [char]9
@@ -114,7 +117,7 @@ function Write-Crud-Abstract-Api {
         $StemNs
     )
 
-    $Ns = Get_Qualified_Namespace -StemNameSpace $StemNs -LocalNameSpace ($SolutionName + '.Specification.Api.Abstraction')
+    $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace ($SolutionName + '.Specification.Api.Abstraction')
 
     $t = [char]9
 
@@ -187,7 +190,7 @@ function Write-Crud-Api {
         $StemNs
     )
 
-    $Ns = Get_Qualified_Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
+    $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
 
     $t = [char]9
     
@@ -212,6 +215,28 @@ function Write-Crud-Api {
     }
 }
 
+function Write-Crud-IRepository {
+    param (
+        $SolutionName,
+        $Name,
+        $Path,
+        $StemNs
+    )
+
+    $t = [char]9
+
+    $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
+
+    $File = Join-Path -Path $Path -ChildPath ($Name + 'Repository.cs')
+    if (-not (Test-Path -Path $File -PathType Leaf))
+    {
+        ('namespace ' + $Ns + '.Specification.Api.Repository') | Out-File -FilePath $File -Append
+        ('{') | Out-File -FilePath $File -Append
+            ($t + 'public interface I' + $Name + 'Repository : I' + $Name + 'Api {}') | Out-File -FilePath $File -Append
+        ('}') | Out-File -FilePath $File -Append
+    }
+}
+
 function Add-Project-And-Push-Location {
     param (
         $Name,
@@ -228,30 +253,44 @@ function Add-Project-And-Push-Location {
     }
     Push-Location $ProjectDir
 
-        if (-not (Test-Path -Path ($ProjectDir + ".csproj")))
+        $ProjectFile = ($ProjectDir + ".csproj")
+        if (-not (Test-Path -Path $ProjectFile -PathType Leaf))
         {
-            $tmp = $StemNameSpace + '.' + $ProjectDir
-            dotnet new $Type -n $tmp -o '.'
+            dotnet new $Type
 
-            Move-Item -Path ('.\' + $tmp + ".csproj") -Destination ('.\' + $ProjectDir + ".csproj")
+            $xml = [xml](Get-Content $ProjectFile)
+            
+            $NamespaceElement = $xml.CreateElement("RootNamespace");
+            $NamespaceElement.AppendChild($xml.CreateTextNode(($StemNs + '.' +$ProjectDir)))
+            $xml.Project.PropertyGroup.AppendChild($NamespaceElement)
 
-            dotnet sln ('../../' + $SolutionName + '.sln') add ($ProjectDir + ".csproj")
+            $AssemblyNameElement = $xml.CreateElement("AssemblyName")
+            $AssemblyNameElement.AppendChild($xml.CreateTextNode(($StemNs + '.' +$ProjectDir)))
+            $xml.Project.PropertyGroup.AppendChild($AssemblyNameElement)
+    
+            $location = Get-Location
+            $SavePath = Join-Path -Path $location -ChildPath $ProjectFile
+            $xml.Save($SavePath)
+            
+
+            dotnet sln ('../../' + $SolutionName + '.sln') add $ProjectFile
+
             if ($Type -eq 'classlib')
             {
                 Remove-Item Class1.cs
             }
+
+            if ($Specification)
+            {
+                dotnet add reference ('../' + $SpecificationProjectDir + "/" + $SpecificationProjectDir + ".csproj")
+            }
+            if ($Domain)
+            {
+                dotnet add reference ('../' + $DomainProjectDir + "/" + $DomainProjectDir + ".csproj")
+            }
         }
 
-        if ($Specification)
-        {
-            dotnet add reference ('../' + $SpecificationProjectDir + "/" + $SpecificationProjectDir + ".csproj")
-        }
-        if ($Domain)
-        {
-            dotnet add reference ('../' + $DomainProjectDir + "/" + $DomainProjectDir + ".csproj")
-        }
-    
-    return $ProjectDir
+        return $ProjectDir
 }
 
 # function Add-IoCConf {
@@ -385,6 +424,21 @@ Push-Location -Path $SolutionDirParent
                         Write-Crud-Api -StemNs $StemNameSpace -SolutionName $SolutionName -Path $Dir -Name $Name
                     }
 
+                    if (-not (Test-Path -Path 'Repository'))
+                    {
+                        mkdir 'Repository'
+                        
+                    }
+                    Push-Location 'Repository'
+
+                        $Dir = Get-Location
+                        foreach ($Name in $Types)
+                        {
+                            Write-Crud-IRepository -SolutionName $SolutionName -Name $Name -Path $Dir -StemNs $StemNameSpace
+                        }
+
+                    Pop-Location # Repository
+
                 Pop-Location # API
                 
             Pop-Location # Specification project folder
@@ -435,6 +489,8 @@ Push-Location -Path $SolutionDirParent
 
             Pop-Location # DomainProjectDir
 
+            
+
             if ($Stack.Contains('application-web-api'))
             {
                 Add-Project-And-Push-Location -StemNs $StemNameSpace -Name 'WebApi' -Type 'webapi' -Specification -Domain
@@ -461,7 +517,7 @@ Push-Location -Path $SolutionDirParent
                     $Dir = Get-Location
                     foreach ($Name in $Types)
                     {
-                        Write-Dbo-Class -Path $Dir -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.SqlDatabase.Dbo' -Name $Name
+                        Write-Dbo-Class -Path $Dir -StemNs $StemNameSpace -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
                     }
 
                 Pop-Location
