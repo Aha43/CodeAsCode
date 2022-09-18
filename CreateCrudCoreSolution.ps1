@@ -1,10 +1,21 @@
-$SolutionDirParent = './Test'
 
-$SolutionName = 'TheAmazingThing'
-$StemNameSpace = 'No.Super.Corp'
 
-$Types = Get-Content -Path "./Test/Types.txt"
-$Stack = Get-Content -Path "./Test/Stack.txt"
+if ($args.Count -eq 0)
+{
+    Write-Error -Message 'No solution name given as input argument'
+
+}
+
+$SolutionName = $args[0]
+
+$SolutionsParentDir = $env:codeascode_repo_dir
+
+$SpecDir = Join-Path -Path $env:codeascode_spec_dir -ChildPath $SolutionName
+
+$StemNameSpace = [Io.File]::ReadAllText((Join-Path -Path $SpecDir -ChildPath 'StemNamespace.txt').Trim())
+
+$Types = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Types.txt')
+$Stack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Stack.txt')
 
 $MakeRepositorySpec = ($Stack.Contains('application-web-api') -or $Stack.Contains('repository-sql'))
 
@@ -128,7 +139,7 @@ function Write-Crud-Abstract-Api {
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface ICreate<T, P> where T : class where P : class') | Out-File -FilePath $File -Append
         ($t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + 'Task<T> ReadAsync(P param, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
+        ($t + $t + 'Task<T> CreateAsync(P param, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
     }
@@ -204,13 +215,14 @@ function Write-Crud-Api {
         ('namespace ' + $Ns + '.Specification.Api') | Out-File -FilePath $File -Append
         ('{') | Out-File -FilePath $File -Append
 
-        $M = 'I' + $Name;
-        $C = 'ICreate' + $Name + 'Param'
-        $R = 'IRead' + $Name + 'Param'
-        $U = 'IUpdate' + $Name + 'Param'
-        $D = 'IDelete' + $Name + 'Param'
+            $M = 'I' + $Name;
+            $C = 'ICreate' + $Name + 'Param'
+            $R = 'IRead' + $Name + 'Param'
+            $U = 'IUpdate' + $Name + 'Param'
+            $D = 'IDelete' + $Name + 'Param'
 
-        ($t + 'public interface I' + $Name + 'Api : ICrud<' + $M + ', ' + $C + ', ' + $R + ', ' + $U + ', ' + $D + '> {}') | Out-File -FilePath $File -Append
+            ($t + 'public interface I' + $Name + 'Api : ICrud<' + $M + ', ' + $C + ', ' + $R + ', ' + $U + ', ' + $D + '> { }') | Out-File -FilePath $File -Append
+
         ('}') | Out-File -FilePath $File -Append
     }
 }
@@ -233,6 +245,70 @@ function Write-Crud-IRepository {
         ('namespace ' + $Ns + '.Specification.Api.Repository') | Out-File -FilePath $File -Append
         ('{') | Out-File -FilePath $File -Append
             ($t + 'public interface I' + $Name + 'Repository : I' + $Name + 'Api {}') | Out-File -FilePath $File -Append
+        ('}') | Out-File -FilePath $File -Append
+    }
+}
+
+function Write-Crud-Implemenation {
+    param (
+        $SolutionName,
+        $Name,
+        $Type,
+        $Tier,
+        $Path,
+        $Ns,
+        $StemNs
+    )
+
+    $t = [char]9
+
+    $RootNs = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
+
+    $ClassName = ($Name + $Type + $Tier)
+    $File = Join-Path -Path $Path -ChildPath ($ClassName + '.cs')
+    if (-not (Test-Path -Path $File -PathType Leaf))
+    {
+        ('using ' + $RootNs + '.Domain.Model;') | Out-File -FilePath $File -Append
+        ('using ' + $RootNs + '.Specification.Api.' + $Tier +';') | Out-File -FilePath $File -Append
+        ('using ' + $RootNs + '.Specification.Domain.Model;') | Out-File -FilePath $File -Append
+        ('using ' + $RootNs + '.Specification.Domain.Param.' + $Name + ';') | Out-File -FilePath $File -Append
+        
+        ('') | Out-File -FilePath $File -Append
+        ('namespace ' + $RootNs + '.' + $Ns) | Out-File -FilePath $File -Append
+        ('{') | Out-File -FilePath $File -Append
+            ($t + 'public class ' + $ClassName + ' : I' + $Name + $Tier) | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+
+                ($t + $t + 'public async Task<I' + $Name +'> CreateAsync(ICreate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                ($t + $t + '{') | Out-File -FilePath $File -Append
+                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
+                ($t + $t + '}') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+
+                ($t + $t + 'public async Task<IEnumerable<I' + $Name +'>> ReadAsync(IRead' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                ($t + $t + '{') | Out-File -FilePath $File -Append
+                ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { Id = param.Id } });') | Out-File -FilePath $File -Append
+                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                ($t + $t + '}') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+
+                ($t + $t + 'public async Task<I' + $Name +'> UpdateAsync(IUpdate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                ($t + $t + '{') | Out-File -FilePath $File -Append
+                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { Id = param.Id });') | Out-File -FilePath $File -Append
+                ($t + $t + '}') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+
+                ($t + $t + 'public async Task<I' + $Name +'> DeleteAsync(IDelete' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                ($t + $t + '{') | Out-File -FilePath $File -Append
+                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { Id = param.Id });') | Out-File -FilePath $File -Append
+                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                ($t + $t + '}') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+
+            ($t + '}') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
         ('}') | Out-File -FilePath $File -Append
     }
 }
@@ -327,7 +403,7 @@ function Add-Project-And-Push-Location {
 # Script starts
 #
 
-Push-Location -Path $SolutionDirParent
+Push-Location -Path $SolutionsParentDir
 
     if (-not (Test-Path -Path $SolutionName -PathType Container))
     {
@@ -426,20 +502,23 @@ Push-Location -Path $SolutionDirParent
                         Write-Crud-Api -StemNs $StemNameSpace -SolutionName $SolutionName -Path $Dir -Name $Name
                     }
 
-                    if (-not (Test-Path -Path 'Repository'))
+                    if ($MakeRepositorySpec -eq $true)
                     {
-                        mkdir 'Repository'
-                        
-                    }
-                    Push-Location 'Repository'
-
-                        $Dir = Get-Location
-                        foreach ($Name in $Types)
+                        if (-not (Test-Path -Path 'Repository'))
                         {
-                            Write-Crud-IRepository -SolutionName $SolutionName -Name $Name -Path $Dir -StemNs $StemNameSpace
+                            mkdir 'Repository'  
                         }
+                        Push-Location 'Repository'
 
-                    Pop-Location # Repository
+                            $Dir = Get-Location
+                            foreach ($Name in $Types)
+                            {
+                                Write-Crud-IRepository -SolutionName $SolutionName -Name $Name -Path $Dir -StemNs $StemNameSpace
+                            }
+
+                        Pop-Location # Repository
+                    }
+                    
 
                 Pop-Location # API
                 
@@ -501,7 +580,13 @@ Push-Location -Path $SolutionDirParent
 
                 Add-Project-And-Push-Location -StemNs $StemNameSpace -Name 'Infrastructure.WebApiClient' -Type 'classlib' -Specification -Domain
 
-                Pop-Location 
+                $Dir = Get-Location
+                foreach ($Name in $Types)
+                {
+                    Write-Crud-Implemenation -Path $Dir -Name $Name -SolutionName $SolutionName -Type 'Client' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.WebApiClient' 
+                }
+
+                Pop-Location # WebApi client dir
             }
 
             if ($Stack.Contains('repository-sql'))
