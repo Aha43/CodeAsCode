@@ -102,21 +102,30 @@ function Write-Dbo-Class {
         $Name
     )
 
-    $File = Join-Path -Path (Get-Location) -ChildPath ($Name + '.cs')
-
-    $Ns = Get-Qualified-Namespace -LocalNameSpace $Ns
-
-    if (-not (Test-Path -Path $File))
+    if (-not (Test-Path 'Dbo' -PathType Container))
     {
-        $t = [char]9
-        ('namespace ' + $Ns) | Out-File -FilePath $File
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public class ' + $Name + 'Dbo') | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + 'public int Id { get; set; }') | Out-File -FilePath $File -Append
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
+        mkdir 'Dbo'
     }
+    Push-Location 'Dbo'
+
+        $Dir = Get-Location
+        $File = Join-Path -Path $Dir -ChildPath ($Name + '.cs')
+
+        $Ns = Get-Qualified-Namespace -LocalNameSpace $Ns
+
+        if (-not (Test-Path -Path $File))
+        {
+            $t = [char]9
+            ('namespace ' + $Ns + '.Dbo') | Out-File -FilePath $File
+            ('{')  | Out-File -FilePath $File -Append
+            ($t + 'public class ' + $Name + 'Dbo') | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+            ($t + $t + 'public int Id { get; set; }') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append 
+            ('} ') | Out-File -FilePath $File -Append
+        }
+    
+    Pop-Location # Dbo
 }
 
 function Write-Crud-Abstract-Api {
@@ -252,19 +261,20 @@ function Write-Crud-Implemenation {
 
     $t = [char]9
 
+    $Ns = Get-Qualified-Namespace -LocalNameSpace $Ns
     $RootNs = Get-Qualified-Namespace -LocalNameSpace $SolutionName
 
     $ClassName = ($Name + $Type + $Tier)
     $File = Join-Path -Path (Get-Location) -ChildPath ($ClassName + '.cs')
     if (-not (Test-Path -Path $File -PathType Leaf))
     {
-        ('using ' + $RootNs + '.Domain.Model;') | Out-File -FilePath $File -Append
+        ('using ' + $RootNs + '.Domain.Model;') | Out-File -FilePath $File
         ('using ' + $RootNs + '.Specification.Api.' + $Tier +';') | Out-File -FilePath $File -Append
         ('using ' + $RootNs + '.Specification.Domain.Model;') | Out-File -FilePath $File -Append
         ('using ' + $RootNs + '.Specification.Domain.Param.' + $Name + ';') | Out-File -FilePath $File -Append
         
         ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $RootNs + '.' + $Ns) | Out-File -FilePath $File -Append
+        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
         ('{') | Out-File -FilePath $File -Append
             ($t + 'public class ' + $ClassName + ' : I' + $Name + $Tier) | Out-File -FilePath $File -Append
             ($t + '{') | Out-File -FilePath $File -Append
@@ -299,12 +309,82 @@ function Write-Crud-Implemenation {
     }
 }
 
+function Write-Api-IoC {
+    param (
+        $Ns,
+        $Tier,
+        $Type,
+        [switch] $UseHttp
+    )
+
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services')
+    
+    if (-not (Test-Path -Path 'Services' -PathType Container))
+    {
+        mkdir 'Services'
+    }
+    Push-Location 'Services'
+
+        $t = [char]9
+    
+        $File = Join-Path -Path (Get-Location) -ChildPath 'IoCConf.cs'
+        if (-not (Test-Path -Path $File -PathType Leaf))
+        {
+            ('using Microsoft.Extensions.Configuration;') | Out-File -FilePath $File
+            ('using Microsoft.Extensions.DependencyInjection;') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{') | Out-File -FilePath $File -Append
+                ($t + 'public static class IoConf') | Out-File -FilePath $File -Append
+                ($t + '{') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public static IServiceCollection Add' + $Type + $Tier + 'Services(this IServiceCollection services, IConfiguration configuration)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+                        if ($UseHttp)
+                        {
+                            (($t + $t + $t + 'services.AddHttpClient();') | Out-File -FilePath $File -Append) | Out-File -FilePath $File -Append
+                        }
+                        (($t + $t + $t + 'services.AddApiServices();') | Out-File -FilePath $File -Append) | Out-File -FilePath $File -Append
+                        ($t + $t + $t + 'return services;') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                ($t + '}') | Out-File -FilePath $File -Append
+            ('}') | Out-File -FilePath $File -Append
+        }
+
+        $File = Join-Path -Path (Get-Location) -ChildPath 'InternalIoCConf.cs'
+
+        $ApiNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Api.' + $Tier)
+        ('// Do not edit this file, it is generated every time codeascode script is run!') | Out-File -FilePath $File
+        ('// Add implemention specific services in the IoCConf file') | Out-File -FilePath $File -Append
+        ('using ' + $ApiNs + ';') | Out-File -FilePath $File -Append
+        ('using Microsoft.Extensions.DependencyInjection;') | Out-File -FilePath $File -Append
+        ('') | Out-File -FilePath $File -Append
+        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+        ('{') | Out-File -FilePath $File -Append
+            ($t + 'internal static class InternalIoCConf') | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+                ($t + $t + 'internal static IServiceCollection AddApiServices(this IServiceCollection services)') | Out-File -FilePath $File -Append
+                ($t + $t + '{') | Out-File -FilePath $File -Append
+                    foreach ($Name in $Types)
+                    {
+                        ($t + $t + $t + 'services.AddSingleton<I' + $Name + $Tier + ', ' + $Name + $Type + $Tier + '>();') | Out-File -FilePath $File -Append
+                    }
+                    ($t + $t + $t + 'return services;') | Out-File -FilePath $File -Append
+                ($t + $t + '}') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append
+        ('}') | Out-File -FilePath $File -Append
+
+    Pop-Location # Config
+}
+
 function Add-Project-And-Push-Location {
     param (
         $Name,
         $Type,
         [switch] $Specification,
-        [switch] $Domain
+        [switch] $Domain,
+        [switch] $Configuration,
+        [switch] $Injection,
+        [switch] $HttpClient
     )
 
     $ProjectDir = ($SolutionName + '.' + $Name)
@@ -351,38 +431,22 @@ function Add-Project-And-Push-Location {
             {
                 dotnet add reference ('../' + $DomainProjectDir + "/" + $DomainProjectDir + ".csproj")
             }
+            if ($Configuration)
+            {
+                dotnet add package Microsoft.Extensions.Configuration.Abstractions
+            }
+            if ($Injection)
+            {
+                dotnet add package Microsoft.Extensions.DependencyInjection.Abstractions
+            }
+            if ($HttpClient)
+            {
+                dotnet add package Microsoft.Extensions.Http
+            }
         }
 
         return $ProjectDir
 }
-
-# function Add-IoCConf {
-#     param (
-#         $Name
-#     )
-    
-#     if (-not (Test-Path -Path 'Config' -PathType Container))
-#     {
-#         mkdir 'Config'
-#     }
-#     Push-Location 'Config'
-
-#         $t = [char]9
-    
-#         $File = 'IoCConf.cs'
-#         if (-not (Test-Path -Path $File -PathType Leaf))
-#         {
-#             ('namespace ')
-#             ('public static class IoConf') | Out-File -FilePath $File
-#             ('{') | Out-File -FilePath $File -Append
-#             ($t + 'public static IServiceCollection Configure' + $Name + 'Services(this IServiceCollection services, IConfiguration configuration)')
-
-#             ('}') | Out-File -FilePath $File -Append
-#         }
-
-#     Pop-Location # Config
-
-# }
 
 #
 # Script starts
@@ -499,7 +563,6 @@ Push-Location -Path $SolutionsParentDir
                         Pop-Location # Repository
                     }
                     
-
                 Pop-Location # API
                 
             Pop-Location # Specification project folder
@@ -550,45 +613,42 @@ Push-Location -Path $SolutionsParentDir
 
             if ($Stack.Contains('application-web-api'))
             {
-                Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Specification -Domain
+                $WebApiProjDir = (Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Specification -Domain)[-1]
 
-                Pop-Location # WebApi project dir
+                Pop-Location # WebApiProjDir
 
-                Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain
+                $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain  -Configuration -Injection -HttpClient)[-1]
 
-                foreach ($Name in $Types)
-                {
-                    Write-Crud-Implemenation -Ns 'Infrastructure.Repository.WebApiClient' -Name $Name -Tier 'Repository' -Type 'Client' 
-                }
+                    foreach ($Name in $Types)
+                    {
+                        Write-Crud-Implemenation -Ns $WebApiClientProjDir -Name $Name -Tier 'Repository' -Type 'WebApiClient' 
+                    }
 
-                Pop-Location # WebApi client dir
+                    Write-Api-IoC -Ns $WebApiClientProjDir -Tier 'Repository' -Type 'WebApiClient' -UseHttp
+
+                Pop-Location # WebApiClientProjDir
             }
 
             if ($Stack.Contains('repository-sql'))
             {
-                Add-Project-And-Push-Location -Name 'Infrastructure.Repository.SqlDatabase' -Type 'classlib' -Specification -Domain
+                $SqlDatabaseProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.SqlDatabase' -Type 'classlib' -Specification -Domain -Configuration -Injection)[-1]
 
                     dotnet add package Dapper
 
-                    if (-not (Test-Path -Path 'Dbo'))
+                    foreach ($Name in $Types)
                     {
-                        mkdir 'Dbo'
+                        #Write-Dbo-Class -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
+                            Write-Dbo-Class -Ns $SqlDatabaseProjDir -Name $Name
                     }
-                    Push-Location 'Dbo'
-
-                        foreach ($Name in $Types)
-                        {
-                            Write-Dbo-Class -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
-                        }
-
-                    Pop-Location # Dbo
 
                     foreach ($Name in $Types)
                     {
-                        Write-Crud-Implemenation -Ns 'Infrastructure.Repository.SqlDatabase' -Tier 'Repository' -Name $Name -Type 'Db'
+                        Write-Crud-Implemenation -Ns $SqlDatabaseProjDir -Name $Name -Tier 'Repository' -Type 'Db'
                     }
 
-                Pop-Location # repository sql project dir
+                    Write-Api-IoC -Ns $SqlDatabaseProjDir -Tier 'Repository' -Type 'Db'
+
+                Pop-Location # SqlDatabaseProjDir
             }
 
         Pop-Location # src
