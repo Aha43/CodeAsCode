@@ -36,12 +36,13 @@ function Get-Qualified-Namespace {
 
 function Write-Dto-Interface {
     param (
-        $Path,
         $StemNs,
         $Ns,
         $Name,
         [Switch]$NoId
     )
+
+    $Path = Get-Location
 
     $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
 
@@ -64,7 +65,6 @@ function Write-Dto-Interface {
 
 function Write-Dto-Class {
     param (
-        $Path,
         $Using,
         $StemNs,
         $Ns,
@@ -75,6 +75,7 @@ function Write-Dto-Class {
 
     $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
 
+    $Path = Get-Location
     $File = Join-Path -Path $Path -ChildPath ($Name + '.cs')
     if (-not (Test-Path -Path $File))
     {
@@ -96,14 +97,13 @@ function Write-Dto-Class {
 
 function Write-Dbo-Class {
     param (
-        $Path,
         $Using,
         $StemNs,
         $Ns,
         $Name
     )
 
-    $File = Join-Path -Path $Path -ChildPath ($Name + '.cs')
+    $File = Join-Path -Path (Get-Location) -ChildPath ($Name + '.cs')
 
     $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $Ns
 
@@ -123,13 +123,14 @@ function Write-Dbo-Class {
 function Write-Crud-Abstract-Api {
     param (
         $SolutionName,
-        $Path,
         $StemNs
     )
 
     $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace ($SolutionName + '.Specification.Api.Abstraction')
 
     $t = [char]9
+
+    $Path = Get-Location
 
     $File = Join-Path -Path $Path -ChildPath 'ICreate.cs'
     if (-not (Test-Path -Path $File))
@@ -196,13 +197,14 @@ function Write-Crud-Api {
     param (
         $SolutionName,
         $Name,
-        $Path,
         $StemNs
     )
 
     $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
 
     $t = [char]9
+
+    $Path = Get-Location
     
     $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'Api.cs')
     if (-not (Test-Path -Path $File))
@@ -230,11 +232,12 @@ function Write-Crud-IRepository {
     param (
         $SolutionName,
         $Name,
-        $Path,
         $StemNs
     )
 
     $t = [char]9
+
+    $Path = Get-Location
 
     $Ns = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
 
@@ -254,7 +257,6 @@ function Write-Crud-Implemenation {
         $Name,
         $Type,
         $Tier,
-        $Path,
         $Ns,
         $StemNs
     )
@@ -264,7 +266,7 @@ function Write-Crud-Implemenation {
     $RootNs = Get-Qualified-Namespace -StemNameSpace $StemNs -LocalNameSpace $SolutionName
 
     $ClassName = ($Name + $Type + $Tier)
-    $File = Join-Path -Path $Path -ChildPath ($ClassName + '.cs')
+    $File = Join-Path -Path (Get-Location) -ChildPath ($ClassName + '.cs')
     if (-not (Test-Path -Path $File -PathType Leaf))
     {
         ('using ' + $RootNs + '.Domain.Model;') | Out-File -FilePath $File -Append
@@ -437,10 +439,9 @@ Push-Location -Path $SolutionsParentDir
                     Push-Location 'Model'
                             
                         $Ns = ($SpecificationProjectDir + '.Domain.Model')
-                        $Dir = Get-Location
                         foreach ($Name in $Types)
                         {
-                            Write-Dto-Interface -Path $Dir -StemNs $StemNameSpace -Ns $Ns -Name $Name
+                            Write-Dto-Interface -StemNs $StemNameSpace -Ns $Ns -Name $Name
                         }
 
                     Pop-Location # Model
@@ -460,12 +461,11 @@ Push-Location -Path $SolutionsParentDir
                             Push-Location $Name
 
                                 $Ns = ($SpecificationProjectDir + '.Domain.Param.' + $Name)
-                                $Dir = Get-Location
                                 
-                                Write-Dto-Interface -Path $Dir -StemNs $StemNameSpace -Ns $Ns -Name ('Create' + $Name + 'Param') -NoId
-                                Write-Dto-Interface -Path $Dir -StemNs $StemNameSpace -Ns $Ns -Name ('Read' + $Name + 'Param')
-                                Write-Dto-Interface -Path $Dir -StemNs $StemNameSpace -Ns $Ns -Name ('Update' + $Name + 'Param')
-                                Write-Dto-Interface -Path $Dir -StemNs $StemNameSpace -Ns $Ns -Name ('Delete' + $Name + 'Param')
+                                Write-Dto-Interface -StemNs $StemNameSpace -Ns $Ns -Name ('Create' + $Name + 'Param') -NoId
+                                Write-Dto-Interface -StemNs $StemNameSpace -Ns $Ns -Name ('Read' + $Name + 'Param')
+                                Write-Dto-Interface -StemNs $StemNameSpace -Ns $Ns -Name ('Update' + $Name + 'Param')
+                                Write-Dto-Interface -StemNs $StemNameSpace -Ns $Ns -Name ('Delete' + $Name + 'Param')
                                 
                             Pop-Location # $Name
                         }
@@ -486,15 +486,13 @@ Push-Location -Path $SolutionsParentDir
                     }
                     Push-Location 'Abstraction'
 
-                        $Dir = Get-Location
-                        Write-Crud-Abstract-Api -StemNs $StemNameSpace -Path $Dir -SolutionName $SolutionName
+                        Write-Crud-Abstract-Api -StemNs $StemNameSpace -SolutionName $SolutionName
 
                     Pop-Location # Abstraction
 
-                    $Dir = Get-Location
                     foreach ($Name in $Types)
                     {
-                        Write-Crud-Api -StemNs $StemNameSpace -SolutionName $SolutionName -Path $Dir -Name $Name
+                        Write-Crud-Api -StemNs $StemNameSpace -SolutionName $SolutionName -Name $Name
                     }
 
                     if ($MakeRepositorySpec -eq $true)
@@ -505,10 +503,9 @@ Push-Location -Path $SolutionsParentDir
                         }
                         Push-Location 'Repository'
 
-                            $Dir = Get-Location
                             foreach ($Name in $Types)
                             {
-                                Write-Crud-IRepository -SolutionName $SolutionName -Name $Name -Path $Dir -StemNs $StemNameSpace
+                                Write-Crud-IRepository -SolutionName $SolutionName -Name $Name -StemNs $StemNameSpace
                             }
 
                         Pop-Location # Repository
@@ -529,10 +526,9 @@ Push-Location -Path $SolutionsParentDir
 
                     $Ns = $DomainProjectDir + '.Model'
                     $Using = $SpecificationProjectDir + '.Domain.Model'
-                    $Dir = Get-Location
                     foreach ($Name in $Types)
                     {
-                        Write-Dto-Class -Path $Dir -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('I' + $Name) -Name $Name
+                        Write-Dto-Class -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('I' + $Name) -Name $Name
                     }
 
                 Pop-Location # Model
@@ -550,14 +546,13 @@ Push-Location -Path $SolutionsParentDir
                             mkdir $Name
                         }
                         Push-Location $Name
-                            $Dir = Get-Location
                             $Using = $SpecificationProjectDir + '.Domain.Param.' + $Name
                             $Ns = $DomainProjectDir + '.Param.' + $Name
                             
-                            Write-Dto-Class -Path $Dir -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('ICreate' + $Name + 'Param') -Name ('Create' + $Name + 'Param') -NoId
-                            Write-Dto-Class -Path $Dir -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('IRead' + $Name + 'Param') -Name ('Read' + $Name + 'Param')
-                            Write-Dto-Class -Path $Dir -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('IUpdate' + $Name + 'Param') -Name ('Update' + $Name + 'Param')
-                            Write-Dto-Class -Path $Dir -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('IDelete' + $Name + 'Param') -Name ('Delete' + $Name + 'Param')
+                            Write-Dto-Class -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('ICreate' + $Name + 'Param') -Name ('Create' + $Name + 'Param') -NoId
+                            Write-Dto-Class -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('IRead' + $Name + 'Param') -Name ('Read' + $Name + 'Param')
+                            Write-Dto-Class -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('IUpdate' + $Name + 'Param') -Name ('Update' + $Name + 'Param')
+                            Write-Dto-Class -Using $Using -StemNs $StemNameSpace -Ns $Ns -Implements ('IDelete' + $Name + 'Param') -Name ('Delete' + $Name + 'Param')
                         Pop-Location # Name
                     }
 
@@ -575,10 +570,9 @@ Push-Location -Path $SolutionsParentDir
 
                 Add-Project-And-Push-Location -StemNs $StemNameSpace -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain
 
-                $Dir = Get-Location
                 foreach ($Name in $Types)
                 {
-                    Write-Crud-Implemenation -Path $Dir -Name $Name -SolutionName $SolutionName -Type 'Client' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.WebApiClient' 
+                    Write-Crud-Implemenation -Name $Name -SolutionName $SolutionName -Type 'Client' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.WebApiClient' 
                 }
 
                 Pop-Location # WebApi client dir
@@ -596,18 +590,16 @@ Push-Location -Path $SolutionsParentDir
                     }
                     Push-Location 'Dbo'
 
-                        $Dir = Get-Location
                         foreach ($Name in $Types)
                         {
-                            Write-Dbo-Class -Path $Dir -StemNs $StemNameSpace -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
+                            Write-Dbo-Class -StemNs $StemNameSpace -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
                         }
 
                     Pop-Location # Dbo
 
-                    $Dir = Get-Location
                     foreach ($Name in $Types)
                     {
-                        Write-Crud-Implemenation -Path $Dir -Name $Name -SolutionName $SolutionName -Type 'Db' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.SqlDatabase' 
+                        Write-Crud-Implemenation -Name $Name -SolutionName $SolutionName -Type 'Db' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.SqlDatabase' 
                     }
 
                 Pop-Location # repository sql project dir
