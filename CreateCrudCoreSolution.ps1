@@ -2,8 +2,7 @@
 
 if ($args.Count -eq 0)
 {
-    Write-Error -Message 'No solution name given as input argument'
-
+    Write-Error -Message 'No solution name given as input argument' -ErrorAction Stop
 }
 
 $SolutionName = $args[0]
@@ -281,7 +280,6 @@ function Write-Crud-Implemenation {
 
                 ($t + $t + 'public async Task<I' + $Name +'> CreateAsync(ICreate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
                 ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
@@ -289,13 +287,11 @@ function Write-Crud-Implemenation {
                 ($t + $t + 'public async Task<IEnumerable<I' + $Name +'>> ReadAsync(IRead' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
                 ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { Id = param.Id } });') | Out-File -FilePath $File -Append
-                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
 
                 ($t + $t + 'public async Task<I' + $Name +'> UpdateAsync(IUpdate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
                 ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { Id = param.Id });') | Out-File -FilePath $File -Append
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
@@ -303,7 +299,6 @@ function Write-Crud-Implemenation {
                 ($t + $t + 'public async Task<I' + $Name +'> DeleteAsync(IDelete' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
                 ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { Id = param.Id });') | Out-File -FilePath $File -Append
-                #($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
 
@@ -578,12 +573,12 @@ Push-Location -Path $SolutionsParentDir
 
                 Pop-Location # WebApi project dir
 
-                Add-Project-And-Push-Location -StemNs $StemNameSpace -Name 'Infrastructure.WebApiClient' -Type 'classlib' -Specification -Domain
+                Add-Project-And-Push-Location -StemNs $StemNameSpace -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain
 
                 $Dir = Get-Location
                 foreach ($Name in $Types)
                 {
-                    Write-Crud-Implemenation -Path $Dir -Name $Name -SolutionName $SolutionName -Type 'Client' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.WebApiClient' 
+                    Write-Crud-Implemenation -Path $Dir -Name $Name -SolutionName $SolutionName -Type 'Client' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.WebApiClient' 
                 }
 
                 Pop-Location # WebApi client dir
@@ -593,23 +588,29 @@ Push-Location -Path $SolutionsParentDir
             {
                 Add-Project-And-Push-Location -StemNs $StemNameSpace -Name 'Infrastructure.Repository.SqlDatabase' -Type 'classlib' -Specification -Domain
 
-                dotnet add package Dapper
+                    dotnet add package Dapper
 
-                if (-not (Test-Path -Path 'Dbo'))
-                {
-                    mkdir 'Dbo'
-                }
-                Push-Location 'Dbo'
+                    if (-not (Test-Path -Path 'Dbo'))
+                    {
+                        mkdir 'Dbo'
+                    }
+                    Push-Location 'Dbo'
+
+                        $Dir = Get-Location
+                        foreach ($Name in $Types)
+                        {
+                            Write-Dbo-Class -Path $Dir -StemNs $StemNameSpace -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
+                        }
+
+                    Pop-Location # Dbo
 
                     $Dir = Get-Location
                     foreach ($Name in $Types)
                     {
-                        Write-Dbo-Class -Path $Dir -StemNs $StemNameSpace -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
+                        Write-Crud-Implemenation -Path $Dir -Name $Name -SolutionName $SolutionName -Type 'Db' -Tier 'Repository' -StemNs $StemNameSpace -Ns 'Infrastructure.Repository.SqlDatabase' 
                     }
 
-                Pop-Location
-
-                Pop-Location
+                Pop-Location # repository sql project dir
             }
 
         Pop-Location # src
