@@ -1,5 +1,4 @@
 
-
 if ($args.Count -eq 0)
 {
     Write-Error -Message 'No solution name given as input argument' -ErrorAction Stop
@@ -22,7 +21,7 @@ $Stack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Stack.txt')
 $MakeRepositorySpec = ($Stack.Contains('application-web-api') -or $Stack.Contains('repository-sql'))
 
 #
-# Functions that generate intial code
+# Functions that generate code
 #
 
 function Get-Qualified-Namespace {
@@ -61,6 +60,8 @@ function Write-Dto-Interface {
         }
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
+
+        Write-ToDo -Item ('Define the ' + $Name + ' by adding properties to the interface ' + $Ns + '.I' + $Name)
     }
 }
 
@@ -92,6 +93,8 @@ function Write-Dto-Class {
         }
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
+
+        Write-ToDo -Item ('Implement the class ' + $Ns + '.' + $Name)
     }
 }
 
@@ -123,6 +126,8 @@ function Write-Dbo-Class {
             ($t + $t + 'public int Id { get; set; }') | Out-File -FilePath $File -Append
             ($t + '}') | Out-File -FilePath $File -Append 
             ('} ') | Out-File -FilePath $File -Append
+
+            Write-ToDo -Item ('Implement the class ' + $Ns + '.' + $Name)
         }
     
     Pop-Location # Dbo
@@ -268,6 +273,8 @@ function Write-Crud-Implemenation {
     $File = Join-Path -Path (Get-Location) -ChildPath ($ClassName + '.cs')
     if (-not (Test-Path -Path $File -PathType Leaf))
     {
+        Write-ToDo -Item ('Implement the class ' + $Ns + '.' + $ClassName)
+
         ('using ' + $RootNs + '.Domain.Model;') | Out-File -FilePath $File
         ('using ' + $RootNs + '.Specification.Api.' + $Tier +';') | Out-File -FilePath $File -Append
         ('using ' + $RootNs + '.Specification.Domain.Model;') | Out-File -FilePath $File -Append
@@ -335,7 +342,7 @@ function Write-Api-IoC {
             ('') | Out-File -FilePath $File -Append
             ('namespace ' + $Ns) | Out-File -FilePath $File -Append
             ('{') | Out-File -FilePath $File -Append
-                ($t + 'public static class IoConf') | Out-File -FilePath $File -Append
+                ($t + 'public static class IoCConf') | Out-File -FilePath $File -Append
                 ($t + '{') | Out-File -FilePath $File -Append
                     ($t + $t + 'public static IServiceCollection Add' + $Type + $Tier + 'Services(this IServiceCollection services, IConfiguration configuration)') | Out-File -FilePath $File -Append
                     ($t + $t + '{') | Out-File -FilePath $File -Append
@@ -376,6 +383,10 @@ function Write-Api-IoC {
     Pop-Location # Config
 }
 
+#
+# Functions that create projects
+#
+
 function Add-Project-And-Push-Location {
     param (
         $Name,
@@ -393,6 +404,8 @@ function Add-Project-And-Push-Location {
         mkdir $ProjectDir
     }
     Push-Location $ProjectDir
+
+        Write-Readme -Header $Name
 
         $ProjectFile = ($ProjectDir + ".csproj")
         if (-not (Test-Path -Path $ProjectFile -PathType Leaf))
@@ -446,6 +459,39 @@ function Add-Project-And-Push-Location {
         }
 
         return $ProjectDir
+}
+
+#
+# Functions that write no code files
+#
+
+function Write-ToDo {
+    param (
+        $Item
+    )
+    
+    $File = ($SolutionsParentDir + '/' + $SolutionName + '/ToDo.md')
+    if (-not (Test-Path -Path $File))
+    {
+        ('# ToDo') | Out-File -FilePath $File
+        ('') | Out-File -FilePath $File -Append
+    }
+    ('- [ ] ' + $Item) | Out-File -FilePath $File -Append
+}
+
+function Write-Readme {
+    param (
+        $Header
+    )
+    $File = "README.md"
+    if (-not (Test-Path -Path $File))
+    {
+        ('# ' + $Header) | Out-File -FilePath $File
+        ('') | Out-File -FilePath $File -Append
+
+        $loc = Get-Location
+        Write-ToDo -Item ('Write content for the README file: ' + $loc + '\README.md')
+    }
 }
 
 #
@@ -637,8 +683,7 @@ Push-Location -Path $SolutionsParentDir
 
                     foreach ($Name in $Types)
                     {
-                        #Write-Dbo-Class -Ns ($SolutionName + '.Infrastructure.Repository.SqlDatabase.Dbo') -Name $Name
-                            Write-Dbo-Class -Ns $SqlDatabaseProjDir -Name $Name
+                        Write-Dbo-Class -Ns $SqlDatabaseProjDir -Name $Name
                     }
 
                     foreach ($Name in $Types)
@@ -654,6 +699,8 @@ Push-Location -Path $SolutionsParentDir
         Pop-Location # src
 
         dotnet build
+
+        Write-Readme -Header $SolutionName
 
     Pop-Location # from solution dir
 
