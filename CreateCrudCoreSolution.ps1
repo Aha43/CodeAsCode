@@ -316,6 +316,92 @@ function Write-Crud-Implemenation {
     }
 }
 
+function Write-Application-IoC {
+    param (
+        $Ns,
+        $ApiTier,
+        $ApiTierType
+    )
+    
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services')
+
+    if (-not (Test-Path -Path 'Services' -PathType Container))
+    {
+        mkdir 'Services'
+    }
+    Push-Location 'Services'
+
+        $t = [char]9
+
+        $File = Join-Path -Path (Get-Location) -ChildPath 'IoCConf.cs'
+        if (-not (Test-Path -Path $File -PathType Leaf))
+        {
+            $LocalApiNs = ($SolutionName + ".Infrastructure." + $ApiTier + '.' + $ApiTierType + '.Services')
+            $ApiServicesNs = (Get-Qualified-Namespace -LocalNameSpace $LocalApiNs)
+
+            ('using ' + $ApiServicesNs + ';') | Out-File -FilePath $File -Append
+            #('using Microsoft.Extensions.Configuration;') | Out-File -FilePath $File -Append
+            #('using Microsoft.Extensions.DependencyInjection;') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{') | Out-File -FilePath $File -Append
+                ($t + 'public static class IoCConf') | Out-File -FilePath $File -Append
+                ($t + '{') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public static IServiceCollection Add' + $Type + $Tier + 'Services(this IServiceCollection services, IConfiguration configuration)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+
+                        $ApiServicesMethod = ("Add" + $ApiTierType + $ApiTier + "Services")
+                        ($t + $t + $t + 'services.' + $ApiServicesMethod + '(configuration);') | Out-File -FilePath $File -Append            
+
+                        ($t + $t + $t + 'return services;') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                ($t + '}') | Out-File -FilePath $File -Append
+            ('}') | Out-File -FilePath $File -Append
+        }
+
+    Pop-Location # Services
+}
+
+function Write-WebApi-Controller {
+    param (
+        $Ns,
+        $Name,
+        $ApiTier
+    )
+    
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Controllers')
+
+    $StemNs = Get-Qualified-Namespace -LocalNameSpace $SolutionName
+
+    $t = [char]9
+
+    $ApiName = ('I' + $Name + $ApiTier)
+
+    $ClassName = ($Name + 'Controller')
+    $File = ($ClassName + '.cs')
+    ('using Microsoft.AspNetCore.Mvc;') | Out-File -FilePath $File -Append
+    ('using ' + $StemNs + '.Domain.Param.' + $Name +';') | Out-File -FilePath $File -Append
+    ('using ' + $StemNs + '.Specification.Api.' + $ApiTier +';') | Out-File -FilePath $File -Append
+    ('') | Out-File -FilePath $File -Append
+    ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+    ('{') | Out-File -FilePath $File -Append
+        ($t + '[ApiController]') | Out-File -FilePath $File -Append
+        ($t + '[Route("[controller]")]') | Out-File -FilePath $File -Append
+        ($t + 'public class ' + $ClassName + ' : ControllerBase') | Out-File -FilePath $File -Append
+        ($t + '{') | Out-File -FilePath $File -Append
+            ($t + $t + 'private readonly ' + $ApiName + ' _api;') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            ($t + $t + 'public ' + $ClassName + '(' + $ApiName + ' api) => _api = api;') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            
+            ($t + $t + '[HttpPost] public async Task<IActionResult> PostAsync([FromBody] Create' + $Name + 'Param param) => Ok(await _api.CreateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+            ($t + $t + '[HttpGet] public async Task<IActionResult> GetAsync([FromQuery] Read' + $Name + 'Param param) => Ok(await _api.ReadAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+            ($t + $t + '[HttpPut] public async Task<IActionResult> PutAsync([FromBody] Update' + $Name + 'Param param) => Ok(await _api.UpdateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+            ($t + $t + '[HttpDelete] public async Task<IActionResult> DeleteAsync([FromQuery] Delete' + $Name + 'Param param) => Ok(await _api.DeleteAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+        ($t + '}') | Out-File -FilePath $File -Append
+    ('}') | Out-File -FilePath $File -Append
+}
+
 function Write-Api-IoC {
     param (
         $Ns,
@@ -395,7 +481,9 @@ function Add-Project-And-Push-Location {
         [switch] $Domain,
         [switch] $Configuration,
         [switch] $Injection,
-        [switch] $HttpClient
+        [switch] $HttpClient,
+        $ApiTier,
+        $ApiType
     )
 
     $ProjectDir = ($SolutionName + '.' + $Name)
@@ -455,6 +543,11 @@ function Add-Project-And-Push-Location {
             if ($HttpClient)
             {
                 dotnet add package Microsoft.Extensions.Http
+            }
+            if ($ApiTier)
+            {
+                $ApiProject = ($SolutionName + '.Infrastructure.' + $ApiTier + '.' + $ApiType)
+                dotnet add reference ('../' + $ApiProject + "/" + $ApiProject + ".csproj")
             }
         }
 
@@ -657,27 +750,10 @@ Push-Location -Path $SolutionsParentDir
 
             Pop-Location # DomainProjectDir
 
-            if ($Stack.Contains('application-web-api'))
-            {
-                $WebApiProjDir = (Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Specification -Domain)[-1]
-
-                Pop-Location # WebApiProjDir
-
-                $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain  -Configuration -Injection -HttpClient)[-1]
-
-                    foreach ($Name in $Types)
-                    {
-                        Write-Crud-Implemenation -Ns $WebApiClientProjDir -Name $Name -Tier 'Repository' -Type 'WebApiClient' 
-                    }
-
-                    Write-Api-IoC -Ns $WebApiClientProjDir -Tier 'Repository' -Type 'WebApiClient' -UseHttp
-
-                Pop-Location # WebApiClientProjDir
-            }
-
             if ($Stack.Contains('repository-sql'))
             {
-                $SqlDatabaseProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.SqlDatabase' -Type 'classlib' -Specification -Domain -Configuration -Injection)[-1]
+                $ApiProject =
+                $SqlDatabaseProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.Db' -Type 'classlib' -Specification -Domain -Configuration -Injection)[-1]
 
                     dotnet add package Dapper
 
@@ -691,9 +767,36 @@ Push-Location -Path $SolutionsParentDir
                         Write-Crud-Implemenation -Ns $SqlDatabaseProjDir -Name $Name -Tier 'Repository' -Type 'Db'
                     }
 
-                    Write-Api-IoC -Ns $SqlDatabaseProjDir -Tier 'Repository' -Type 'Db'
+                    Write-Api-IoC -Ns $SqlDatabaseProjDir -Tier 'Repository' -Type 'Db' 
 
                 Pop-Location # SqlDatabaseProjDir
+            }
+
+            if ($Stack.Contains('application-web-api'))
+            {
+                $WebApiProjDir = (Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db')[-1]
+
+                    Write-Application-IoC -Ns $WebApiProjDir -ApiTier 'Repository' -ApiTierType 'Db'
+
+                    Push-Location 'Controllers'
+                        foreach ($Name in $Types)
+                        {
+                            Write-WebApi-Controller -Ns $WebApiProjDir -Name $Name -ApiTier 'Repository' -ApiType 'Db'
+                        }
+                    Pop-Location       
+
+                Pop-Location # WebApiProjDir
+
+                $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain -Configuration -Injection -HttpClient)[-1]
+
+                    foreach ($Name in $Types)
+                    {
+                        Write-Crud-Implemenation -Ns $WebApiClientProjDir -Name $Name -Tier 'Repository' -Type 'WebApiClient' 
+                    }
+
+                    Write-Api-IoC -Ns $WebApiClientProjDir -Tier 'Repository' -Type 'WebApiClient' -UseHttp
+
+                Pop-Location # WebApiClientProjDir
             }
 
         Pop-Location # src
