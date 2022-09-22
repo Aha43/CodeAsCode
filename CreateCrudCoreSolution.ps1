@@ -20,6 +20,8 @@ $Stack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Stack.txt')
 
 $MakeRepositorySpec = ($Stack.Contains('application-web-api') -or $Stack.Contains('repository-sql'))
 
+$Business = $true # read | detect later
+
 #
 # Functions that generate code
 #
@@ -61,7 +63,81 @@ function Write-Dto-Interface {
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
 
-        Write-ToDo -Item ('Define the ' + $Name + ' by adding properties to the interface ' + $Ns + '.I' + $Name)
+        Write-ToDo -Item ('Define the ' + $Name + ' DTO by adding properties to the interface ' + $Ns + '.I' + $Name)
+    }
+}
+
+function Write-ViewModel-Interface {
+    param (
+        $Name
+    )
+    
+    $Path = Get-Location
+
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewModel')
+
+    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'ViewModel.cs')
+    if (-not (Test-Path -Path $File))
+    {
+        $t = [char]9
+        ('namespace ' + $Ns) | Out-File -FilePath $File
+        ('{')  | Out-File -FilePath $File -Append
+        ($t + 'public interface I' + $Name + 'ViewModel') | Out-File -FilePath $File -Append
+        ($t + '{') | Out-File -FilePath $File -Append
+        ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
+        ($t + '}') | Out-File -FilePath $File -Append 
+        ('} ') | Out-File -FilePath $File -Append
+
+        Write-ToDo -Item ('Define the ' + $Name + ' ViewModel by modifing the interface ' + $Ns + '.I' + $Name + 'ViewModel')
+    }
+}
+
+function Write-ViewController-Interfaces {
+    param (
+        $Name
+    )
+    
+    $Path = Get-Location
+
+    $VmNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewModel')
+    $Ns = Get-Qualified-Namespace -LocalNameSpace  ($SolutionName + '.Specification.Business.Controller')
+
+    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'ViewController.cs')
+    if (-not (Test-Path -Path $File))
+    {
+        $t = [char]9
+
+        ('using ' + $VmNs + ';') | Out-File -FilePath $File
+        ('') | Out-File -FilePath $File -Append
+        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+        ('{')  | Out-File -FilePath $File -Append
+        ($t + 'public interface I' + $Name + 'ViewController') | Out-File -FilePath $File -Append
+        ($t + '{') | Out-File -FilePath $File -Append
+        ($t + $t + 'Task LoadAsync(int id, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
+        ($t + $t + 'I' + $Name + 'ViewModel ' + $Name + ' { get; }') | Out-File -FilePath $File -Append
+        ($t + '}') | Out-File -FilePath $File -Append 
+        ('} ') | Out-File -FilePath $File -Append
+
+        Write-ToDo -Item ('Define the ' + $Name + ' ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'ViewController')
+    }
+
+    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'sViewController.cs')
+    if (-not (Test-Path -Path $File))
+    {
+        $t = [char]9
+
+        ('using ' + $VmNs + ';') | Out-File -FilePath $File
+        ('') | Out-File -FilePath $File -Append
+        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+        ('{')  | Out-File -FilePath $File -Append
+        ($t + 'public interface I' + $Name + 'sViewController') | Out-File -FilePath $File -Append
+        ($t + '{') | Out-File -FilePath $File -Append
+        ($t + $t + 'Task LoadAsync(CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
+        ($t + $t + 'IEnumerable<I' + $Name + 'ViewModel> ' + $Name + 's { get; }') | Out-File -FilePath $File -Append
+        ($t + '}') | Out-File -FilePath $File -Append 
+        ('} ') | Out-File -FilePath $File -Append
+
+        Write-ToDo -Item ('Define the ' + $Name + 's ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'sViewController')
     }
 }
 
@@ -131,6 +207,37 @@ function Write-Dbo-Class {
         }
     
     Pop-Location # Dbo
+}
+
+function WriteViewModel {
+    param (
+        
+    )
+    
+    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'ViewController.cs')
+    if (-not (Test-Path -Path $File))
+    {
+        $t = [char]9
+
+        ('using ' + $VmNs + ';') | Out-File -FilePath $File
+        ('') | Out-File -FilePath $File -Append
+        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+        ('{')  | Out-File -FilePath $File -Append
+        ($t + 'public class ' + $Name + 'ViewController : I' + $Name + 'ViewController') | Out-File -FilePath $File -Append
+        ($t + '{') | Out-File -FilePath $File -Append
+        ($t + $t + 'public async Task LoadAsync(int id, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
+        ($t + $t + '{') | Out-File -FilePath $File -Append
+        ($t + $t + $t + '') 
+        ($t + $t + '}') | Out-File -FilePath $File -Append
+        ($t + $t + 'I' + $Name + 'ViewModel ' + $Name + ' { get; private set; }') | Out-File -FilePath $File -Append
+        ($t + '}') | Out-File -FilePath $File -Append 
+        ('} ') | Out-File -FilePath $File -Append
+
+        ('') | Out-File -FilePath $File -Append
+        ('class Vm : I' + $Name + 'ViewModel { public int Id { get; init; }')
+
+        Write-ToDo -Item ('Define the ' + $Name + ' ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'ViewModel')
+    }
 }
 
 function Write-Crud-Abstract-Api {
@@ -347,7 +454,7 @@ function Write-Application-IoC {
             ('{') | Out-File -FilePath $File -Append
                 ($t + 'public static class IoCConf') | Out-File -FilePath $File -Append
                 ($t + '{') | Out-File -FilePath $File -Append
-                    ($t + $t + 'public static IServiceCollection Add' + $Type + $Tier + 'Services(this IServiceCollection services, IConfiguration configuration)') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public static IServiceCollection AddApplicationServices(this IServiceCollection services, IConfiguration configuration)') | Out-File -FilePath $File -Append
                     ($t + $t + '{') | Out-File -FilePath $File -Append
 
                         $ApiServicesMethod = ("Add" + $ApiTierType + $ApiTier + "Services")
@@ -360,6 +467,27 @@ function Write-Application-IoC {
         }
 
     Pop-Location # Services
+}
+
+function EditApplicationProgramFile {
+    param (
+        $Ns
+    )
+    $File = 'Program.cs'
+    $ProgramContent = Get-Content -Path $File
+    
+    ('using ' + (Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services;'))) | Out-File -FilePath $File
+
+    foreach ($Line in $ProgramContent)
+    {
+        $Line | Out-File -FilePath $File -Append
+        if ($Line -like '*Add services*')
+        {
+            ('') | Out-File -FilePath $File -Append
+            ('builder.Services.AddApplicationServices(builder.Configuration);') | Out-File $File -Append
+            ('') | Out-File -FilePath $File -Append
+        }
+    }
 }
 
 function Write-WebApi-Controller {
@@ -665,6 +793,43 @@ Push-Location -Path $SolutionsParentDir
 
                 Pop-Location # Domain
 
+                if ($Business)
+                {
+                    if (-not (Test-Path -Path 'Business'))
+                    {
+                        mkdir 'Business'
+                    }
+                    Push-Location 'Business'
+
+                        if (-not (Test-Path -Path 'ViewModel'))
+                        {
+                            mkdir 'ViewModel'
+                        }
+                        Push-Location 'ViewModel'
+
+                            foreach ($Name in $Types)
+                            {
+                                Write-ViewModel-Interface -Name $Name
+                            }
+
+                        Pop-Location # ViewModel
+
+                        if (-not (Test-Path -Path 'ViewController'))
+                        {
+                            mkdir 'ViewController'
+                        }
+                        Push-Location 'ViewController'
+
+                            foreach ($Name in $Types)
+                            {
+                                Write-ViewController-Interfaces -Name $Name
+                            }
+
+                        Pop-Location # ViewController
+
+                    Pop-Location # Business
+                }
+
                 if (-not (Test-Path -Path 'Api' -PathType Container))
                 {
                     mkdir 'Api'
@@ -778,6 +943,8 @@ Push-Location -Path $SolutionsParentDir
 
                     Write-Application-IoC -Ns $WebApiProjDir -ApiTier 'Repository' -ApiTierType 'Db'
 
+                    EditApplicationProgramFile -Ns $WebApiProjDir
+
                     Push-Location 'Controllers'
                         foreach ($Name in $Types)
                         {
@@ -800,6 +967,8 @@ Push-Location -Path $SolutionsParentDir
             }
 
         Pop-Location # src
+
+
 
         dotnet build
 
