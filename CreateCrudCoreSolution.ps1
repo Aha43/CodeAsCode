@@ -209,34 +209,42 @@ function Write-Dbo-Class {
     Pop-Location # Dbo
 }
 
-function WriteViewModel {
-    param (
-        
+function Write-ViewModel {
+    param(
+        $Name
     )
+
+    $VmInterfaceNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewModel');
+    $ModelInterfaceNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model');
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Business.ViewModel')
+
+    $Class = $Name + 'ViewModel'
     
-    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'ViewController.cs')
+    $File = ($Class + 'ViewModel.cs')
     if (-not (Test-Path -Path $File))
     {
         $t = [char]9
 
-        ('using ' + $VmNs + ';') | Out-File -FilePath $File
+        $ModelInterface = ('I' + $Name)
+        $Interface = ('I' + $Name + 'ViewModel')
+
+        ('using ' + $VmInterfaceNs + ';') | Out-File -FilePath $File
+        ('using ' + $ModelInterfaceNs + ';') | Out-File -FilePath $File -Append
         ('') | Out-File -FilePath $File -Append
         ('namespace ' + $Ns) | Out-File -FilePath $File -Append
         ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public class ' + $Name + 'ViewController : I' + $Name + 'ViewController') | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + 'public async Task LoadAsync(int id, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
-        ($t + $t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + $t + '') 
-        ($t + $t + '}') | Out-File -FilePath $File -Append
-        ($t + $t + 'I' + $Name + 'ViewModel ' + $Name + ' { get; private set; }') | Out-File -FilePath $File -Append
-        ($t + '}') | Out-File -FilePath $File -Append 
+            ($t + 'public class ' + $Class + ' : ' + $Interface) | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+                ($t + $t + 'private readonly ' + $ModelInterface + '? _model;') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+                ($t + $t + 'public ' + $Class + '(' + $ModelInterface + '? model = null) => _model = model;') | Out-File -FilePath $File -Append
+                ($t + $t + 'public int Id => _model?.Id ?? 0;') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+                ($t + $t + 'public static ' + $Class + ' Empty => new();') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
 
-        ('') | Out-File -FilePath $File -Append
-        ('class Vm : I' + $Name + 'ViewModel { public int Id { get; init; }')
-
-        Write-ToDo -Item ('Define the ' + $Name + ' ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'ViewModel')
+        Write-ToDo -Item ('Implement the ' + $Class)
     }
 }
 
@@ -966,9 +974,29 @@ Push-Location -Path $SolutionsParentDir
                 Pop-Location # WebApiClientProjDir
             }
 
+            if ($Business)
+            {
+                $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Business' -Type 'classlib' -Specification)[-1]
+
+                    if (-not (Test-Path -Path 'ViewModel'))
+                    {
+                        mkdir 'ViewModel'
+                    }
+                    Push-Location 'ViewModel'
+
+                        foreach ($Name in $Types)
+                        {
+                            Write-ViewModel -Name $Name
+                        }
+
+                    Pop-Location # ViewModel
+
+                Pop-Location
+            }
+
         Pop-Location # src
 
-
+        
 
         dotnet build
 
