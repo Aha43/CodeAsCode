@@ -1,6 +1,6 @@
+. ($PSScriptRoot + '/Common.fun.ps1')
 
-if ($args.Count -eq 0)
-{
+if ($args.Count -eq 0){
     Write-Error -Message 'No solution name given as input argument' -ErrorAction Stop
 }
 
@@ -16,54 +16,71 @@ $SpecDir = Join-Path -Path $env:codeascode_spec_dir -ChildPath $SolutionName
 $StemNameSpace = [Io.File]::ReadAllText((Join-Path -Path $SpecDir -ChildPath 'StemNamespace.txt').Trim())
 
 $Types = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Types.txt')
-$Stack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Stack.txt')
+$FrontendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'FrontendStack.txt')
+$BackendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'BackendStack.txt')
 
-$MakeRepositorySpec = ($Stack.Contains('application-web-api') -or $Stack.Contains('repository-sql'))
+function StacksGotTire {
+    param (
+        $Tier
+    )
+    if ($FrontendStack.Contains($Tier)) {
+        return $true
+    }
+    return $BackendStack.Contains($Tier)
+}
 
-$Business = $true # read | detect later
+$MakeRepositorySpec = (StacksGotTire -Tier 'application-web-api') -or (StacksGotTire -Tier 'repository-sql')
+
+$Business = $false # read | detect later
+if ($FrontendStack.Contains('business') -or 
+    $FrontendStack.Contains('application-blazor-server-mud')) {
+    $Business = $true
+}
 
 #
 # Functions that generate code
 #
 
-function Get-Qualified-Namespace {
-    param (
-        $LocalNameSpace
-    )
-    if ($StemNameSpace.Length -gt 0)
-    {
-        return $StemNameSpace + '.' + $LocalNameSpace
-    }
-    return $LocalNameSpace
-}
-
 function Write-Dto-Interface {
     param (
-        $Ns,
         $Name,
+        $CrudParam,
         [Switch]$NoId
     )
 
-    $Path = Get-Location
+    $TypeName = $Name
 
-    $Ns = Get-Qualified-Namespace -LocalNameSpace $Ns
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.')
+    if ($CrudParam) {
+        Push-And-Ensure -Name 'Param'
+        Push-And-Ensure -Name $Name
+        $Ns += ('Param.' + $Name)
+        $TypeName = ($CrudParam + $Name + 'Param')
+    }
+    else {
+        Push-And-Ensure -Name 'Model'
+        $Ns += 'Model'
+    }
 
-    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + '.cs')
-    if (-not (Test-Path -Path $File))
-    {
+    $File = ('I' + $TypeName + '.cs')
+    if (-not (Test-Path -Path $File)) {
         $t = [char]9
         ('namespace ' + $Ns) | Out-File -FilePath $File
         ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public interface I' + $Name) | Out-File -FilePath $File -Append
+        ($t + 'public interface I' + $TypeName) | Out-File -FilePath $File -Append
         ($t + '{') | Out-File -FilePath $File -Append
-        if ($NoId -eq $false)
-        {
+        if ($NoId -eq $false) {
             ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
         }
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
 
-        Write-ToDo -Item ('Define the ' + $Name + ' DTO by adding properties to the interface ' + $Ns + '.I' + $Name)
+        Write-ToDo -Item ('Define the ' + $TypeName + ' interface')
+    }
+
+    Pop-Location
+    if ($CrudParam) {
+        Pop-Location
     }
 }
 
@@ -71,106 +88,126 @@ function Write-ViewModel-Interface {
     param (
         $Name
     )
-    
-    $Path = Get-Location
 
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewModel')
 
-    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'ViewModel.cs')
-    if (-not (Test-Path -Path $File))
-    {
-        $t = [char]9
-        ('namespace ' + $Ns) | Out-File -FilePath $File
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public interface I' + $Name + 'ViewModel') | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
+    Push-And-Ensure -Name 'ViewModel'
 
-        Write-ToDo -Item ('Define the ' + $Name + ' ViewModel by modifing the interface ' + $Ns + '.I' + $Name + 'ViewModel')
-    }
+        $File = ('I' + $Name + 'ViewModel.cs')
+        if (-not (Test-Path -Path $File))
+        {
+            $t = [char]9
+            ('namespace ' + $Ns) | Out-File -FilePath $File
+            ('{')  | Out-File -FilePath $File -Append
+            ($t + 'public interface I' + $Name + 'ViewModel') | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+            ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append 
+            ('} ') | Out-File -FilePath $File -Append
+
+            Write-ToDo -Item ('Define the ' + $Name + ' ViewModel by modifing the interface ' + $Ns + '.I' + $Name + 'ViewModel')
+        }
+    Pop-Location
 }
 
 function Write-ViewController-Interfaces {
     param (
         $Name
     )
-    
-    $Path = Get-Location
 
     $VmNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewModel')
-    $Ns = Get-Qualified-Namespace -LocalNameSpace  ($SolutionName + '.Specification.Business.Controller')
+    $Ns = Get-Qualified-Namespace -LocalNameSpace  ($SolutionName + '.Specification.Business.ViewController')
 
-    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'ViewController.cs')
-    if (-not (Test-Path -Path $File))
-    {
-        $t = [char]9
+    Push-And-Ensure -Name 'ViewController'
 
-        ('using ' + $VmNs + ';') | Out-File -FilePath $File
-        ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public interface I' + $Name + 'ViewController') | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + 'Task LoadAsync(int id, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
-        ($t + $t + 'I' + $Name + 'ViewModel ' + $Name + ' { get; }') | Out-File -FilePath $File -Append
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
+        $File = ('I' + $Name + 'ViewController.cs')
+        if (-not (Test-Path -Path $File))
+        {
+            $t = [char]9
 
-        Write-ToDo -Item ('Define the ' + $Name + ' ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'ViewController')
-    }
+            ('using ' + $VmNs + ';') | Out-File -FilePath $File
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{')  | Out-File -FilePath $File -Append
+            ($t + 'public interface I' + $Name + 'ViewController') | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+            ($t + $t + 'Task LoadAsync(int id, CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
+            ($t + $t + 'I' + $Name + 'ViewModel ' + $Name + ' { get; }') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append 
+            ('} ') | Out-File -FilePath $File -Append
 
-    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'sViewController.cs')
-    if (-not (Test-Path -Path $File))
-    {
-        $t = [char]9
+            Write-ToDo -Item ('Define the ' + $Name + ' ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'ViewController')
+        }
 
-        ('using ' + $VmNs + ';') | Out-File -FilePath $File
-        ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public interface I' + $Name + 'sViewController') | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        ($t + $t + 'Task LoadAsync(CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
-        ($t + $t + 'IEnumerable<I' + $Name + 'ViewModel> ' + $Name + 's { get; }') | Out-File -FilePath $File -Append
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
+        $File = ('I' + $Name + 'sViewController.cs')
+        if (-not (Test-Path -Path $File))
+        {
+            $t = [char]9
 
-        Write-ToDo -Item ('Define the ' + $Name + 's ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'sViewController')
-    }
+            ('using ' + $VmNs + ';') | Out-File -FilePath $File
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{')  | Out-File -FilePath $File -Append
+            ($t + 'public interface I' + $Name + 'sViewController') | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+            ($t + $t + 'Task LoadAsync(CancellationToken cancellationToken = default);') | Out-File -FilePath $File -Append
+            ($t + $t + 'IEnumerable<I' + $Name + 'ViewModel> ' + $Name + 's { get; }') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append 
+            ('} ') | Out-File -FilePath $File -Append
+
+            Write-ToDo -Item ('Define the ' + $Name + 's ViewController by modifing the interface ' + $Ns + '.I' + $Name + 'sViewController')
+        }
+
+    Pop-Location
 }
 
 function Write-Dto-Class {
     param (
-        $Using,
-        $Ns,
         $Name,
-        $Implements,
-        [switch]$NoId
+        $CrudParam,
+        [Switch]$NoId
     )
 
-    $Ns = Get-Qualified-Namespace -LocalNameSpace $Ns
+    $TypeName = $Name
+    $Implements = ('I' + $Name)
+    $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model')
 
-    $Path = Get-Location
-    $File = Join-Path -Path $Path -ChildPath ($Name + '.cs')
-    if (-not (Test-Path -Path $File))
-    {
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Domain.')
+    if ($CrudParam) {
+        Push-And-Ensure -Name 'Param'
+            Push-And-Ensure -Name $Name
+                $Ns += ('Param.' + $Name)
+                $TypeName = ($CrudParam + $Name + 'Param')
+                $Implements = ('I' + $TypeName)
+                $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Param.' + $Name)
+    }
+    else {
+        Push-And-Ensure -Name 'Model'
+            $Ns += 'Model'
+    }
+
+    $File = ($TypeName + '.cs')
+    if (-not (Test-Path -Path $File)) {
+
         $t = [char]9
-        ('using ' + $StemNameSpace + '.' + $Using + ';') | Out-File -FilePath $File
+        ('using ' + $Using + ';') | Out-File -FilePath $File
         ('') | Out-File -FilePath $File -Append
         ('namespace ' + $Ns) | Out-File -FilePath $File -Append
         ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public class ' + $Name + ' : ' + $Implements) | Out-File -FilePath $File -Append
+        ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
         ($t + '{') | Out-File -FilePath $File -Append
-        if ($NoId -eq $false)
-        {
+        if ($NoId -eq $false) {
             ($t + $t + 'public int Id { get; init; }') | Out-File -FilePath $File -Append
         }
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
 
-        Write-ToDo -Item ('Implement the class ' + $Ns + '.' + $Name)
+        Write-ToDo -Item ('Define the ' + $TypeName + ' class')
+    }
+
+    Pop-Location
+    if ($CrudParam) {
+        Pop-Location
     }
 }
 
@@ -218,47 +255,108 @@ function Write-ViewModel {
     $ModelInterfaceNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model');
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Business.ViewModel')
 
-    $Class = $Name + 'ViewModel'
+    Push-And-Ensure -Name 'ViewModel'
+
+        $Class = $Name + 'ViewModel'
+        
+        $File = ($Class + 'ViewModel.cs')
+        if (-not (Test-Path -Path $File)) {
+            $t = [char]9
+
+            $ModelInterface = ('I' + $Name)
+            $Interface = ('I' + $Name + 'ViewModel')
+
+            ('using ' + $VmInterfaceNs + ';') | Out-File -FilePath $File
+            ('using ' + $ModelInterfaceNs + ';') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{')  | Out-File -FilePath $File -Append
+                ($t + 'public class ' + $Class + ' : ' + $Interface) | Out-File -FilePath $File -Append
+                ($t + '{') | Out-File -FilePath $File -Append
+                    ($t + $t + 'private readonly ' + $ModelInterface + '? _model;') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public ' + $Class + '(' + $ModelInterface + '? model = null) => _model = model;') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public int Id => _model?.Id ?? 0;') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public static ' + $Class + ' Empty => new();') | Out-File -FilePath $File -Append
+                ($t + '}') | Out-File -FilePath $File -Append 
+            ('} ') | Out-File -FilePath $File -Append
+
+            Write-ToDo -Item ('Implement the ' + $Class)
+        }
+
+    Pop-Location # ViewModel
+}
+
+function Write-ViewControllers {
+    param (
+        $Name
+    )
     
-    $File = ($Class + 'ViewModel.cs')
-    if (-not (Test-Path -Path $File))
-    {
-        $t = [char]9
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + 'Business.ViewController')
+    $VmInterfaceNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewModel');
+    $VmCntInterfaceNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Business.ViewController');
 
-        $ModelInterface = ('I' + $Name)
-        $Interface = ('I' + $Name + 'ViewModel')
+    Push-And-Ensure -Name 'ViewController'
 
-        ('using ' + $VmInterfaceNs + ';') | Out-File -FilePath $File
-        ('using ' + $ModelInterfaceNs + ';') | Out-File -FilePath $File -Append
-        ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-        ('{')  | Out-File -FilePath $File -Append
-            ($t + 'public class ' + $Class + ' : ' + $Interface) | Out-File -FilePath $File -Append
-            ($t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + 'private readonly ' + $ModelInterface + '? _model;') | Out-File -FilePath $File -Append
-                ('') | Out-File -FilePath $File -Append
-                ($t + $t + 'public ' + $Class + '(' + $ModelInterface + '? model = null) => _model = model;') | Out-File -FilePath $File -Append
-                ($t + $t + 'public int Id => _model?.Id ?? 0;') | Out-File -FilePath $File -Append
-                ('') | Out-File -FilePath $File -Append
-                ($t + $t + 'public static ' + $Class + ' Empty => new();') | Out-File -FilePath $File -Append
-            ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
+        $Class = ($Name + 'ViewController')
+        $File = ($Class + '.cs')
+        if (-not (Test-Path -Path $File -PathType Leaf)) {
 
-        Write-ToDo -Item ('Implement the ' + $Class)
-    }
+            $t = [char]9
+
+            ('using ' + $VmInterfaceNs + ';') | Out-File -FilePath $File
+            ('using ' + $VmCntInterfaceNs + ';') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{') | Out-File -FilePath $File -Append
+                ($t + 'public class ' + $Class + ' : I' + $Class) | Out-File -FilePath $File -Append
+                ($t + '{') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public I' + $Name + 'ViewModel ' + $Name + ' => throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public async Task LoadAsync(int id, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+                        ($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                ($t + '}') | Out-File -FilePath $File -Append
+            ('}') | Out-File -FilePath $File -Append
+        }
+
+        $Class = ($Name + 'sViewController')
+        $File = ($Class + 's.cs')
+        if (-not (Test-Path -Path $File -PathType Leaf)) {
+
+            $t = [char]9
+
+            ('using ' + $VmInterfaceNs + ';') | Out-File -FilePath $File
+            ('using ' + $VmCntInterfaceNs + ';') | Out-File -FilePath $File -Append
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{') | Out-File -FilePath $File -Append
+                ($t + 'public class ' + $Class + ' : I' + $Class) | Out-File -FilePath $File -Append
+                ($t + '{') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public IEnumerable<I' + $Name + 'ViewModel> ' + $Name + 's => throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public async Task LoadAsync(CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+                        ($t + $t + $t + 'throw new NotImplementedException();') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                ($t + '}') | Out-File -FilePath $File -Append
+            ('}') | Out-File -FilePath $File -Append
+        }
+
+    Pop-Location # ViewController
 }
 
 function Write-Crud-Abstract-Api {
 
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Api.Abstraction')
 
-    $t = [char]9
+    $File = 'ICreate.cs'
+    if (-not (Test-Path -Path $File)) {
 
-    $Path = Get-Location
+        $t = [char]9
 
-    $File = Join-Path -Path $Path -ChildPath 'ICreate.cs'
-    if (-not (Test-Path -Path $File))
-    {
         ('namespace ' + $Ns) | Out-File -FilePath $File
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface ICreate<T, P> where T : class where P : class') | Out-File -FilePath $File -Append
@@ -268,9 +366,8 @@ function Write-Crud-Abstract-Api {
         ('} ') | Out-File -FilePath $File -Append
     }
 
-    $File = Join-Path -Path $Path -ChildPath 'IRead.cs'
-    if (-not (Test-Path -Path $File))
-    {
+    $File = 'IRead.cs'
+    if (-not (Test-Path -Path $File)) {
         ('namespace ' + $Ns) | Out-File -FilePath $File
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface IRead<T, P> where T : class where P : class') | Out-File -FilePath $File -Append
@@ -280,9 +377,8 @@ function Write-Crud-Abstract-Api {
         ('} ') | Out-File -FilePath $File -Append
     }
 
-    $File = Join-Path -Path $Path -ChildPath 'IUpdate.cs'
-    if (-not (Test-Path -Path $File))
-    {
+    $File = 'IUpdate.cs'
+    if (-not (Test-Path -Path $File)) {
         ('namespace ' + $Ns) | Out-File -FilePath $File
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface IUpdate<T, P> where T : class where P : class') | Out-File -FilePath $File -Append
@@ -292,9 +388,8 @@ function Write-Crud-Abstract-Api {
         ('} ') | Out-File -FilePath $File -Append
     }
 
-    $File = Join-Path -Path $Path -ChildPath 'IDelete.cs'
-    if (-not (Test-Path -Path $File))
-    {
+    $File = 'IDelete.cs'
+    if (-not (Test-Path -Path $File)) {
         ('namespace ' + $Ns) | Out-File -FilePath $File
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface IDelete<T, P> where T : class where P : class') | Out-File -FilePath $File -Append
@@ -304,9 +399,8 @@ function Write-Crud-Abstract-Api {
         ('} ') | Out-File -FilePath $File -Append
     }
 
-    $File = Join-Path -Path $Path -ChildPath 'ICrud.cs'
-    if (-not (Test-Path -Path $File))
-    {
+    $File = 'ICrud.cs'
+    if (-not (Test-Path -Path $File)) {
         ('namespace ' + $Ns) | Out-File -FilePath $File
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface ICrud<T, Cp, Rp, Up, Dp> : ICreate<T, Cp>, IRead<T, Rp>, IUpdate<T, Up>, IDelete<T, Dp> where T : class where Cp : class where Rp : class where Up : class where Dp : class') | Out-File -FilePath $File -Append
@@ -314,7 +408,6 @@ function Write-Crud-Abstract-Api {
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
     }
-
 }
 
 function Write-Crud-Api {
@@ -325,12 +418,9 @@ function Write-Crud-Api {
     $Ns = Get-Qualified-Namespace -LocalNameSpace $SolutionName
 
     $t = [char]9
-
-    $Path = Get-Location
     
-    $File = Join-Path -Path $Path -ChildPath ('I' + $Name + 'Api.cs')
-    if (-not (Test-Path -Path $File))
-    {
+    $File = ('I' + $Name + 'Api.cs')
+    if (-not (Test-Path -Path $File)) {
         ('using ' + $Ns + '.Specification.Api.Abstraction;') | Out-File -FilePath $File
         ('using ' + $Ns + '.Specification.Domain.Model;') | Out-File -FilePath $File -Append
         ('using ' + $Ns + '.Specification.Domain.Param.' + $Name +';') | Out-File -FilePath $File -Append
@@ -357,13 +447,10 @@ function Write-Crud-IRepository {
 
     $t = [char]9
 
-    $Path = Get-Location
-
     $Ns = Get-Qualified-Namespace -LocalNameSpace $SolutionName
 
-    $File = Join-Path -Path $Path -ChildPath ($Name + 'Repository.cs')
-    if (-not (Test-Path -Path $File -PathType Leaf))
-    {
+    $File = ($Name + 'Repository.cs')
+    if (-not (Test-Path -Path $File -PathType Leaf)) {
         ('namespace ' + $Ns + '.Specification.Api.Repository') | Out-File -FilePath $File -Append
         ('{') | Out-File -FilePath $File -Append
             ($t + 'public interface I' + $Name + 'Repository : I' + $Name + 'Api { }') | Out-File -FilePath $File -Append
@@ -385,9 +472,8 @@ function Write-Crud-Implemenation {
     $RootNs = Get-Qualified-Namespace -LocalNameSpace $SolutionName
 
     $ClassName = ($Name + $Type + $Tier)
-    $File = Join-Path -Path (Get-Location) -ChildPath ($ClassName + '.cs')
-    if (-not (Test-Path -Path $File -PathType Leaf))
-    {
+    $File = ($ClassName + '.cs')
+    if (-not (Test-Path -Path $File -PathType Leaf)) {
         Write-ToDo -Item ('Implement the class ' + $Ns + '.' + $ClassName)
 
         ('using ' + $RootNs + '.Domain.Model;') | Out-File -FilePath $File
@@ -440,17 +526,12 @@ function Write-Application-IoC {
     
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services')
 
-    if (-not (Test-Path -Path 'Services' -PathType Container))
-    {
-        mkdir 'Services'
-    }
-    Push-Location 'Services'
+    Push-And-Ensure -Name 'Services'
 
         $t = [char]9
 
         $File = Join-Path -Path (Get-Location) -ChildPath 'IoCConf.cs'
-        if (-not (Test-Path -Path $File -PathType Leaf))
-        {
+        if (-not (Test-Path -Path $File -PathType Leaf)) {
             $LocalApiNs = ($SolutionName + ".Infrastructure." + $ApiTier + '.' + $ApiTierType + '.Services')
             $ApiServicesNs = (Get-Qualified-Namespace -LocalNameSpace $LocalApiNs)
 
@@ -477,7 +558,7 @@ function Write-Application-IoC {
     Pop-Location # Services
 }
 
-function EditApplicationProgramFile {
+function Edit-ApplicationProgramFile {
     param (
         $Ns
     )
@@ -486,8 +567,7 @@ function EditApplicationProgramFile {
     
     ('using ' + (Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services;'))) | Out-File -FilePath $File
 
-    foreach ($Line in $ProgramContent)
-    {
+    foreach ($Line in $ProgramContent) {
         $Line | Out-File -FilePath $File -Append
         if ($Line -like '*Add services*')
         {
@@ -548,11 +628,7 @@ function Write-Api-IoC {
 
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services')
     
-    if (-not (Test-Path -Path 'Services' -PathType Container))
-    {
-        mkdir 'Services'
-    }
-    Push-Location 'Services'
+    Push-And-Ensure 'Services'
 
         $t = [char]9
     
@@ -623,19 +699,23 @@ function Add-Project-And-Push-Location {
     )
 
     $ProjectDir = ($SolutionName + '.' + $Name)
-    if (-not (Test-Path -Path $ProjectDir -PathType Container))
-    {
-        mkdir $ProjectDir
-    }
-    Push-Location $ProjectDir
+    Push-And-Ensure -Name $ProjectDir
 
         Write-Readme -Header $Name
 
         $ProjectFile = ($ProjectDir + ".csproj")
-        if (-not (Test-Path -Path $ProjectFile -PathType Leaf))
-        {
+        if (-not (Test-Path -Path $ProjectFile -PathType Leaf)) {
+            
             $tmp = $StemNameSpace + '.' + $ProjectDir
-            dotnet new $Type -n $tmp -o '.'
+
+            if ($Type -eq 'application-blazor-server-mud')
+            {
+                dotnet new mudblazor --host Server -n $tmp -o '.'
+            }
+            else {
+                dotnet new $Type -n $tmp -o '.'
+            }
+            
             Move-Item -Path ('.\' + $tmp + ".csproj") -Destination ('.\' + $ProjectDir + ".csproj")
 
             $xml = [xml](Get-Content $ProjectFile)
@@ -652,36 +732,28 @@ function Add-Project-And-Push-Location {
             $SavePath = Join-Path -Path $location -ChildPath $ProjectFile
             $xml.Save($SavePath)
             
-
             dotnet sln ('../../' + $SolutionName + '.sln') add $ProjectFile
 
-            if ($Type -eq 'classlib')
-            {
+            if ($Type -eq 'classlib') {
                 Remove-Item Class1.cs
             }
 
-            if ($Specification)
-            {
+            if ($Specification) {
                 dotnet add reference ('../' + $SpecificationProjectDir + "/" + $SpecificationProjectDir + ".csproj")
             }
-            if ($Domain)
-            {
+            if ($Domain) {
                 dotnet add reference ('../' + $DomainProjectDir + "/" + $DomainProjectDir + ".csproj")
             }
-            if ($Configuration)
-            {
+            if ($Configuration) {
                 dotnet add package Microsoft.Extensions.Configuration.Abstractions
             }
-            if ($Injection)
-            {
+            if ($Injection) {
                 dotnet add package Microsoft.Extensions.DependencyInjection.Abstractions
             }
-            if ($HttpClient)
-            {
+            if ($HttpClient) {
                 dotnet add package Microsoft.Extensions.Http
             }
-            if ($ApiTier)
-            {
+            if ($ApiTier) {
                 $ApiProject = ($SolutionName + '.Infrastructure.' + $ApiTier + '.' + $ApiType)
                 dotnet add reference ('../' + $ApiProject + "/" + $ApiProject + ".csproj")
             }
@@ -700,8 +772,7 @@ function Write-ToDo {
     )
     
     $File = ($SolutionsParentDir + '/' + $SolutionName + '/ToDo.md')
-    if (-not (Test-Path -Path $File))
-    {
+    if (-not (Test-Path -Path $File)) {
         ('# ToDo') | Out-File -FilePath $File
         ('') | Out-File -FilePath $File -Append
     }
@@ -713,8 +784,7 @@ function Write-Readme {
         $Header
     )
     $File = "README.md"
-    if (-not (Test-Path -Path $File))
-    {
+    if (-not (Test-Path -Path $File)) {
         ('# ' + $Header) | Out-File -FilePath $File
         ('') | Out-File -FilePath $File -Append
 
@@ -729,11 +799,7 @@ function Write-Readme {
 
 Push-Location -Path $SolutionsParentDir
 
-    if (-not (Test-Path -Path $SolutionName -PathType Container))
-    {
-        mkdir $SolutionName 
-    }
-    Push-Location -Path $SolutionName
+    Push-And-Ensure -Name $SolutionName
 
         if (-not (Test-Path -Path '.gitignore' -PathType Leaf))
         {
@@ -745,110 +811,41 @@ Push-Location -Path $SolutionsParentDir
             dotnet new sln
         }
 
-        if (-not (Test-Path -Path 'src' -PathType Container))
-        {
-            mkdir src
-        }
-        Push-Location 'src' 
+        Push-And-Ensure -Name 'src'
 
             $SpecificationProjectDir = (Add-Project-And-Push-Location -Name 'Specification' -Type 'classlib')[-1]
 
-                if (-not (Test-Path -Path 'Domain' -PathType Container))
-                {
-                    mkdir 'Domain'
-                }
-                Push-Location 'Domain'
-
-                    if (-not (Test-Path -Path 'Model' -PathType Container))
-                    {
-                        mkdir 'Model'
-                    }
-                    Push-Location 'Model'
+                Push-And-Ensure -Name 'Domain'
                             
-                        $Ns = ($SpecificationProjectDir + '.Domain.Model')
-                        foreach ($Name in $Types)
-                        {
-                            Write-Dto-Interface -Ns $Ns -Name $Name
-                        }
+                    foreach ($Name in $Types) {
+                        Write-Dto-Interface -Name $Name
+                    }
 
-                    Pop-Location # Model
-
-                    if (-not (Test-Path 'Param' -PathType Container))
-                    {
-                        mkdir 'Param'
-                    } 
-                    Push-Location 'Param'
-
-                        foreach ($Name in $Types)
-                        {
-                            if (-not (Test-Path $Name -PathType Container))
-                            {
-                                mkdir $Name
-                            }
-                            Push-Location $Name
-
-                                $Ns = ($SpecificationProjectDir + '.Domain.Param.' + $Name)
-                                
-                                Write-Dto-Interface -Ns $Ns -Name ('Create' + $Name + 'Param') -NoId
-                                Write-Dto-Interface -Ns $Ns -Name ('Read' + $Name + 'Param')
-                                Write-Dto-Interface -Ns $Ns -Name ('Update' + $Name + 'Param')
-                                Write-Dto-Interface -Ns $Ns -Name ('Delete' + $Name + 'Param')
-                                
-                            Pop-Location # $Name
-                        }
-
-                    Pop-Location # Param
+                    foreach ($Name in $Types) {       
+                        Write-Dto-Interface -Name $Name -NoId -CrudParam 'Create'
+                        Write-Dto-Interface -Name $Name -CrudParam 'Read'
+                        Write-Dto-Interface -Name $Name -CrudParam 'Update'
+                        Write-Dto-Interface -Name $Name -CrudParam 'Delete'
+                    }
 
                 Pop-Location # Domain
 
                 if ($Business)
                 {
-                    if (-not (Test-Path -Path 'Business'))
-                    {
-                        mkdir 'Business'
-                    }
-                    Push-Location 'Business'
+                    Push-And-Ensure 'Business'
 
-                        if (-not (Test-Path -Path 'ViewModel'))
+                        foreach ($Name in $Types)
                         {
-                            mkdir 'ViewModel'
+                            Write-ViewModel-Interface -Name $Name
+                            Write-ViewController-Interfaces -Name $Name
                         }
-                        Push-Location 'ViewModel'
-
-                            foreach ($Name in $Types)
-                            {
-                                Write-ViewModel-Interface -Name $Name
-                            }
-
-                        Pop-Location # ViewModel
-
-                        if (-not (Test-Path -Path 'ViewController'))
-                        {
-                            mkdir 'ViewController'
-                        }
-                        Push-Location 'ViewController'
-
-                            foreach ($Name in $Types)
-                            {
-                                Write-ViewController-Interfaces -Name $Name
-                            }
-
-                        Pop-Location # ViewController
 
                     Pop-Location # Business
                 }
 
-                if (-not (Test-Path -Path 'Api' -PathType Container))
-                {
-                    mkdir 'Api'
-                }
-                Push-Location 'Api'
+                Push-And-Ensure 'Api'
 
-                    if (-not (Test-Path -Path 'Abstraction'))
-                    {
-                        mkdir 'Abstraction'
-                    }
-                    Push-Location 'Abstraction'
+                    Push-And-Ensure 'Abstraction'
 
                         Write-Crud-Abstract-Api
 
@@ -861,11 +858,7 @@ Push-Location -Path $SolutionsParentDir
 
                     if ($MakeRepositorySpec -eq $true)
                     {
-                        if (-not (Test-Path -Path 'Repository'))
-                        {
-                            mkdir 'Repository'  
-                        }
-                        Push-Location 'Repository'
+                        Push-And-Ensure 'Repository'
 
                             foreach ($Name in $Types)
                             {
@@ -881,49 +874,25 @@ Push-Location -Path $SolutionsParentDir
 
             $DomainProjectDir = (Add-Project-And-Push-Location -Name 'Domain' -Type 'classlib' -Specification)[-1]
 
-                if (-not (Test-Path -Path 'Model'))
+                foreach ($Name in $Types)
                 {
-                    mkdir 'Model'
+                    Write-Dto-Class -Name $Name
                 }
-                Push-Location 'Model'
 
-                    $Ns = $DomainProjectDir + '.Model'
-                    $Using = $SpecificationProjectDir + '.Domain.Model'
-                    foreach ($Name in $Types)
-                    {
-                        Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -Implements ('I' + $Name) 
-                    }
-
-                Pop-Location # Model
-
-                if (-not (Test-Path -Path 'Param'))
+                foreach ($Name in $Types)
                 {
-                    mkdir 'Param'
+                    $Using = $SpecificationProjectDir + '.Domain.Param.' + $Name
+                    $Ns = $DomainProjectDir + '.Param.' + $Name
+                    
+                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Create' -NoId
+                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Read'
+                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Update'
+                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Delete'
                 }
-                Push-Location 'Param'
-
-                    foreach ($Name in $Types)
-                    {
-                        if (-not (Test-Path -Path $Name))
-                        {
-                            mkdir $Name
-                        }
-                        Push-Location $Name
-                            $Using = $SpecificationProjectDir + '.Domain.Param.' + $Name
-                            $Ns = $DomainProjectDir + '.Param.' + $Name
-                            
-                            Write-Dto-Class -Using $Using -Ns $Ns -Name ('Create' + $Name + 'Param') -Implements ('ICreate' + $Name + 'Param') -NoId
-                            Write-Dto-Class -Using $Using -Ns $Ns -Name ('Read' + $Name + 'Param')   -Implements ('IRead' + $Name + 'Param')
-                            Write-Dto-Class -Using $Using -Ns $Ns -Name ('Update' + $Name + 'Param') -Implements ('IUpdate' + $Name + 'Param')
-                            Write-Dto-Class -Using $Using -Ns $Ns -Name ('Delete' + $Name + 'Param') -Implements ('IDelete' + $Name + 'Param')
-                        Pop-Location # Name
-                    }
-
-                Pop-Location # Param
 
             Pop-Location # DomainProjectDir
 
-            if ($Stack.Contains('repository-sql'))
+            if (StacksGotTire -Tier 'repository-sql')
             {
                 $ApiProject =
                 $SqlDatabaseProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.Db' -Type 'classlib' -Specification -Domain -Configuration -Injection)[-1]
@@ -945,13 +914,13 @@ Push-Location -Path $SolutionsParentDir
                 Pop-Location # SqlDatabaseProjDir
             }
 
-            if ($Stack.Contains('application-web-api'))
+            if ($BackendStack.Contains('application-web-api'))
             {
                 $WebApiProjDir = (Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db')[-1]
 
                     Write-Application-IoC -Ns $WebApiProjDir -ApiTier 'Repository' -ApiTierType 'Db'
 
-                    EditApplicationProgramFile -Ns $WebApiProjDir
+                    Edit-ApplicationProgramFile -Ns $WebApiProjDir
 
                     Push-Location 'Controllers'
                         foreach ($Name in $Types)
@@ -978,30 +947,27 @@ Push-Location -Path $SolutionsParentDir
             {
                 $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Business' -Type 'classlib' -Specification)[-1]
 
-                    if (-not (Test-Path -Path 'ViewModel'))
-                    {
-                        mkdir 'ViewModel'
-                    }
-                    Push-Location 'ViewModel'
-
-                        foreach ($Name in $Types)
-                        {
+                        foreach ($Name in $Types) {
                             Write-ViewModel -Name $Name
+                            Write-ViewControllers -Name $Name
                         }
 
-                    Pop-Location # ViewModel
+                Pop-Location # Business project dir
+            }
 
-                Pop-Location
+            if ($FrontendStack.Contains('application-blazor-server-mud'))
+            {
+                $MudBlazorServerProjDir = (Add-Project-And-Push-Location -Name 'MudBlazorServer' -Type 'application-blazor-server-mud' -Specification)[-1]
+
+                Pop-Location # 
             }
 
         Pop-Location # src
-
-        
 
         dotnet build
 
         Write-Readme -Header $SolutionName
 
-    Pop-Location # from solution dir
+    Pop-Location # solution dir
 
-Pop-Location # from solution parent dir
+Pop-Location # solution parent dir
