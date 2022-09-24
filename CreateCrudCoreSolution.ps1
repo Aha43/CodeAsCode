@@ -458,7 +458,7 @@ function Write-Crud-IRepository {
     }
 }
 
-function Write-Crud-Implemenation {
+function Write-Crud-Implementation {
     param (
         $Ns,
         $Name,
@@ -830,7 +830,7 @@ Push-Location -Path $SolutionsParentDir
 
                     foreach ($Name in $Types)
                     {
-                        Write-Crud-Implemenation -Ns $SqlDatabaseProjDir -Name $Name -Tier 'Repository' -Type 'Db'
+                        Write-Crud-Implementation -Ns $SqlDatabaseProjDir -Name $Name -Tier 'Repository' -Type 'Db'
                     }
 
                     Write-Api-IoC -Ns $SqlDatabaseProjDir -Tier 'Repository' -Type 'Db' 
@@ -864,7 +864,7 @@ Push-Location -Path $SolutionsParentDir
 
                     foreach ($Name in $Types)
                     {
-                        Write-Crud-Implemenation -Ns $WebApiClientProjDir -Name $Name -Tier 'Repository' -Type 'WebApiClient' 
+                        Write-Crud-Implementation -Ns $WebApiClientProjDir -Name $Name -Tier 'Repository' -Type 'WebApiClient' 
                     }
 
                     Write-Api-IoC -Ns $WebApiClientProjDir -Tier 'Repository' -Type 'WebApiClient' -UseHttp
