@@ -735,7 +735,8 @@ Push-Location -Path $SolutionsParentDir
 
         Push-And-Ensure -Name 'src'
 
-            $SpecificationProjectDir = (Add-Project-And-Push-Location -Name 'Specification' -Type 'classlib')[-1]
+            $SpecificationProjectDir = ($SolutionName + '.Specification')
+            Add-Project-And-Push-Location -Name $SpecificationProjectDir -Type 'classlib'
 
                 Push-And-Ensure -Name 'Domain'
                             
@@ -794,7 +795,8 @@ Push-Location -Path $SolutionsParentDir
                 
             Pop-Location # Specification project folder
 
-            $DomainProjectDir = (Add-Project-And-Push-Location -Name 'Domain' -Type 'classlib' -Specification)[-1]
+            $DomainProjectDir = ($SolutionName + '.Domain')
+            Add-Project-And-Push-Location -Name $DomainProjectDir -Type 'classlib' -Specification
 
                 foreach ($Name in $Types)
                 {
@@ -817,7 +819,7 @@ Push-Location -Path $SolutionsParentDir
             if (StacksGotTire -Tier 'repository-sql')
             {
                 $SqlDatabaseProjDir = ($SolutionName + '.Infrastructure.Repository.Db')
-                Add-Project-And-Push-Location -Name 'Infrastructure.Repository.Db' -Type 'classlib' -Specification -Domain -Configuration -Injection
+                Add-Project-And-Push-Location -Name $SqlDatabaseProjDir -Type 'classlib' -Specification -Domain -Configuration -Injection
 
                     dotnet add package Dapper
 
@@ -839,7 +841,7 @@ Push-Location -Path $SolutionsParentDir
             if ($BackendStack.Contains('application-web-api'))
             {
                 $WebApiProjDir = ($SolutionName + '.WebApi')
-                Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db'
+                Add-Project-And-Push-Location -Name $WebApiProjDir -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db'
 
                     Write-Application-IoC -Ns $WebApiProjDir -ApiTier 'Repository' -ApiTierType 'Db'
 
@@ -855,7 +857,7 @@ Push-Location -Path $SolutionsParentDir
                 Pop-Location # WebApiProjDir
 
                 $WebApiClientProjDir = ($SolutionName + '.Infrastructure.Repository.WebApiClient')
-                Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain -Configuration -Injection -HttpClient
+                Add-Project-And-Push-Location -Name $WebApiClientProjDir -Type 'classlib' -Specification -Domain -Configuration -Injection -HttpClient
 
                     foreach ($Name in $Types)
                     {
@@ -869,7 +871,8 @@ Push-Location -Path $SolutionsParentDir
 
             if ($Business)
             {
-                $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Business' -Type 'classlib' -Specification)[-1]
+                $WebApiClientProjDir = ($SolutionName + '.Business')
+                Add-Project-And-Push-Location -Name $WebApiClientProjDir -Type 'classlib' -Specification
 
                         foreach ($Name in $Types) {
                             Write-ViewModel -Name $Name
@@ -881,7 +884,8 @@ Push-Location -Path $SolutionsParentDir
 
             if ($FrontendStack.Contains('application-blazor-server-mud'))
             {
-                $MudBlazorServerProjDir = (Add-Project-And-Push-Location -Name 'MudBlazorServer' -Type 'application-blazor-server-mud' -Specification)[-1]
+                $MudBlazorServerProjDir = ($SolutionName + '.MudBlazorServer')
+                Add-Project-And-Push-Location -Name $MudBlazorServerProjDir -Type 'application-blazor-server-mud' -Specification
 
                 Pop-Location # 
             }

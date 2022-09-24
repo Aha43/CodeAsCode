@@ -20,6 +20,7 @@ function Get-Qualified-Namespace {
     return $LocalNameSpace
 }
 
+
 function Add-Project-And-Push-Location {
     param (
         $Name,
@@ -33,15 +34,14 @@ function Add-Project-And-Push-Location {
         $ApiType
     )
 
-    $ProjectDir = ($SolutionName + '.' + $Name)
-    Push-And-Ensure -Name $ProjectDir
+    Push-And-Ensure -Name $Name
 
         Write-Readme -Header $Name
 
-        $ProjectFile = ($ProjectDir + ".csproj")
+        $ProjectFile = ($Name + ".csproj")
         if (-not (Test-Path -Path $ProjectFile -PathType Leaf)) {
             
-            $tmp = $StemNameSpace + '.' + $ProjectDir
+            $tmp = $StemNameSpace + '.' + $Name
 
             if ($Type -eq 'application-blazor-server-mud')
             {
@@ -51,16 +51,16 @@ function Add-Project-And-Push-Location {
                 dotnet new $Type -n $tmp -o '.'
             }
             
-            Move-Item -Path ('.\' + $tmp + ".csproj") -Destination ('.\' + $ProjectDir + ".csproj")
+            Move-Item -Path ('.\' + $tmp + ".csproj") -Destination ('.\' + $Name + ".csproj")
 
             $xml = [xml](Get-Content $ProjectFile)
             
             $NamespaceElement = $xml.CreateElement("RootNamespace");
-            $NamespaceElement.AppendChild($xml.CreateTextNode(($StemNameSpace + '.' +$ProjectDir)))
+            $NamespaceElement.AppendChild($xml.CreateTextNode(($StemNameSpace + '.' +$Name)))
             $xml.Project.PropertyGroup.AppendChild($NamespaceElement)
 
             $AssemblyNameElement = $xml.CreateElement("AssemblyName")
-            $AssemblyNameElement.AppendChild($xml.CreateTextNode(($StemNameSpace + '.' +$ProjectDir)))
+            $AssemblyNameElement.AppendChild($xml.CreateTextNode(($StemNameSpace + '.' +$Name)))
             $xml.Project.PropertyGroup.AppendChild($AssemblyNameElement)
     
             $location = Get-Location
@@ -93,7 +93,4 @@ function Add-Project-And-Push-Location {
                 dotnet add reference ('../' + $ApiProject + "/" + $ApiProject + ".csproj")
             }
         }
-
-        $LastPrj = $ProjectDir
-        return $ProjectDir
 }
