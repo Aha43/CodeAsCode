@@ -566,6 +566,7 @@ function Edit-ApplicationProgramFile {
     $ProgramContent = Get-Content -Path $File
     
     ('using ' + (Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services;'))) | Out-File -FilePath $File
+    ('') | Out-File -FilePath $File -Append
 
     foreach ($Line in $ProgramContent) {
         $Line | Out-File -FilePath $File -Append
@@ -573,7 +574,6 @@ function Edit-ApplicationProgramFile {
         {
             ('') | Out-File -FilePath $File -Append
             ('builder.Services.AddApplicationServices(builder.Configuration);') | Out-File $File -Append
-            ('') | Out-File -FilePath $File -Append
         }
     }
 }
@@ -841,11 +841,14 @@ Push-Location -Path $SolutionsParentDir
             if ($BackendStack.Contains('application-web-api'))
             {
                 $WebApiProjDir = ($SolutionName + '.WebApi')
+                $ProjectExisted = (Test-Path -Path $WebApiProjDir)
                 Add-Project-And-Push-Location -Name $WebApiProjDir -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db'
 
                     Write-Application-IoC -Ns $WebApiProjDir -ApiTier 'Repository' -ApiTierType 'Db'
 
-                    Edit-ApplicationProgramFile -Ns $WebApiProjDir
+                    if (-not $ProjectExisted) {
+                        Edit-ApplicationProgramFile -Ns $WebApiProjDir
+                    }
 
                     Push-Location 'Controllers'
                         foreach ($Name in $Types)
