@@ -595,27 +595,30 @@ function Write-WebApi-Controller {
 
     $ClassName = ($Name + 'Controller')
     $File = ($ClassName + '.cs')
-    ('using Microsoft.AspNetCore.Mvc;') | Out-File -FilePath $File -Append
-    ('using ' + $StemNs + '.Domain.Param.' + $Name +';') | Out-File -FilePath $File -Append
-    ('using ' + $StemNs + '.Specification.Api.' + $ApiTier +';') | Out-File -FilePath $File -Append
-    ('') | Out-File -FilePath $File -Append
-    ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-    ('{') | Out-File -FilePath $File -Append
-        ($t + '[ApiController]') | Out-File -FilePath $File -Append
-        ($t + '[Route("[controller]")]') | Out-File -FilePath $File -Append
-        ($t + 'public class ' + $ClassName + ' : ControllerBase') | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-            ($t + $t + 'private readonly ' + $ApiName + ' _api;') | Out-File -FilePath $File -Append
-            ('') | Out-File -FilePath $File -Append
-            ($t + $t + 'public ' + $ClassName + '(' + $ApiName + ' api) => _api = api;') | Out-File -FilePath $File -Append
-            ('') | Out-File -FilePath $File -Append
-            
-            ($t + $t + '[HttpPost] public async Task<IActionResult> PostAsync([FromBody] Create' + $Name + 'Param param) => Ok(await _api.CreateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-            ($t + $t + '[HttpGet] public async Task<IActionResult> GetAsync([FromQuery] Read' + $Name + 'Param param) => Ok(await _api.ReadAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-            ($t + $t + '[HttpPut] public async Task<IActionResult> PutAsync([FromBody] Update' + $Name + 'Param param) => Ok(await _api.UpdateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-            ($t + $t + '[HttpDelete] public async Task<IActionResult> DeleteAsync([FromQuery] Delete' + $Name + 'Param param) => Ok(await _api.DeleteAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-        ($t + '}') | Out-File -FilePath $File -Append
-    ('}') | Out-File -FilePath $File -Append
+    
+    if (-not (Test-Path -Path $File -PathType Leaf)) {
+        ('using Microsoft.AspNetCore.Mvc;') | Out-File -FilePath $File -Append
+        ('using ' + $StemNs + '.Domain.Param.' + $Name +';') | Out-File -FilePath $File -Append
+        ('using ' + $StemNs + '.Specification.Api.' + $ApiTier +';') | Out-File -FilePath $File -Append
+        ('') | Out-File -FilePath $File -Append
+        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+        ('{') | Out-File -FilePath $File -Append
+            ($t + '[ApiController]') | Out-File -FilePath $File -Append
+            ($t + '[Route("[controller]")]') | Out-File -FilePath $File -Append
+            ($t + 'public class ' + $ClassName + ' : ControllerBase') | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+                ($t + $t + 'private readonly ' + $ApiName + ' _api;') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+                ($t + $t + 'public ' + $ClassName + '(' + $ApiName + ' api) => _api = api;') | Out-File -FilePath $File -Append
+                ('') | Out-File -FilePath $File -Append
+                
+                ($t + $t + '[HttpPost] public async Task<IActionResult> PostAsync([FromBody] Create' + $Name + 'Param param) => Ok(await _api.CreateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                ($t + $t + '[HttpGet] public async Task<IActionResult> GetAsync([FromQuery] Read' + $Name + 'Param param) => Ok(await _api.ReadAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                ($t + $t + '[HttpPut] public async Task<IActionResult> PutAsync([FromBody] Update' + $Name + 'Param param) => Ok(await _api.UpdateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                ($t + $t + '[HttpDelete] public async Task<IActionResult> DeleteAsync([FromQuery] Delete' + $Name + 'Param param) => Ok(await _api.DeleteAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+            ($t + '}') | Out-File -FilePath $File -Append
+        ('}') | Out-File -FilePath $File -Append
+    }
 }
 
 function Write-Api-IoC {
@@ -813,8 +816,8 @@ Push-Location -Path $SolutionsParentDir
 
             if (StacksGotTire -Tier 'repository-sql')
             {
-                $ApiProject =
-                $SqlDatabaseProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.Db' -Type 'classlib' -Specification -Domain -Configuration -Injection)[-1]
+                $SqlDatabaseProjDir = ($SolutionName + '.Infrastructure.Repository.Db')
+                Add-Project-And-Push-Location -Name 'Infrastructure.Repository.Db' -Type 'classlib' -Specification -Domain -Configuration -Injection
 
                     dotnet add package Dapper
 
@@ -835,7 +838,8 @@ Push-Location -Path $SolutionsParentDir
 
             if ($BackendStack.Contains('application-web-api'))
             {
-                $WebApiProjDir = (Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db')[-1]
+                $WebApiProjDir = ($SolutionName + '.WebApi')
+                Add-Project-And-Push-Location -Name 'WebApi' -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db'
 
                     Write-Application-IoC -Ns $WebApiProjDir -ApiTier 'Repository' -ApiTierType 'Db'
 
@@ -850,7 +854,8 @@ Push-Location -Path $SolutionsParentDir
 
                 Pop-Location # WebApiProjDir
 
-                $WebApiClientProjDir = (Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain -Configuration -Injection -HttpClient)[-1]
+                $WebApiClientProjDir = ($SolutionName + '.Infrastructure.Repository.WebApiClient')
+                Add-Project-And-Push-Location -Name 'Infrastructure.Repository.WebApiClient' -Type 'classlib' -Specification -Domain -Configuration -Injection -HttpClient
 
                     foreach ($Name in $Types)
                     {

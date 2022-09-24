@@ -94,5 +94,6 @@ function Add-Project-And-Push-Location {
             }
         }
 
+        $LastPrj = $ProjectDir
         return $ProjectDir
 }
