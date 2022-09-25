@@ -30,6 +30,7 @@ function Add-Project-And-Push-Location {
         [switch] $Configuration,
         [switch] $Injection,
         [switch] $HttpClient,
+        [switch] $Business,
         $ApiTier,
         $ApiType
     )
@@ -92,5 +93,8 @@ function Add-Project-And-Push-Location {
                 $ApiProject = ($SolutionName + '.Infrastructure.' + $ApiTier + '.' + $ApiType)
                 dotnet add reference ('../' + $ApiProject + "/" + $ApiProject + ".csproj")
             }
+            if ($Business) {
+                dotnet add reference ('../' + $SolutionName + '.Infrastructure.Business/' + $SolutionName + '.Infrastructure.Business.csproj')
+            }
         }
-}
+    }
