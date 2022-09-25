@@ -1,5 +1,6 @@
 . ($PSScriptRoot + '/Common.fun.ps1')
 . ($PSScriptRoot + '/IoC.fun.ps1')
+. ($PSScriptRoot + '/Dto.fun.ps1')
 
 if ($args.Count -eq 0){
     Write-Error -Message 'No solution name given as input argument' -ErrorAction Stop
@@ -42,48 +43,7 @@ if ($FrontendStack.Contains('business') -or
 # Functions that generate code
 #
 
-function Write-Dto-Interface {
-    param (
-        $Name,
-        $CrudParam,
-        [Switch]$NoId
-    )
 
-    $TypeName = $Name
-
-    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.')
-    if ($CrudParam) {
-        Push-And-Ensure -Name 'Param'
-        Push-And-Ensure -Name $Name
-        $Ns += ('Param.' + $Name)
-        $TypeName = ($CrudParam + $Name + 'Param')
-    }
-    else {
-        Push-And-Ensure -Name 'Model'
-        $Ns += 'Model'
-    }
-
-    $File = ('I' + $TypeName + '.cs')
-    if (-not (Test-Path -Path $File)) {
-        $t = [char]9
-        ('namespace ' + $Ns) | Out-File -FilePath $File
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public interface I' + $TypeName) | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        if ($NoId -eq $false) {
-            ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
-        }
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
-
-        Write-ToDo -Item ('Define the ' + $TypeName + ' interface')
-    }
-
-    Pop-Location
-    if ($CrudParam) {
-        Pop-Location
-    }
-}
 
 function Write-ViewModel-Interface {
     param (
@@ -162,55 +122,7 @@ function Write-ViewController-Interfaces {
     Pop-Location
 }
 
-function Write-Dto-Class {
-    param (
-        $Name,
-        $CrudParam,
-        [Switch]$NoId
-    )
 
-    $TypeName = $Name
-    $Implements = ('I' + $Name)
-    $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model')
-
-    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Domain.')
-    if ($CrudParam) {
-        Push-And-Ensure -Name 'Param'
-            Push-And-Ensure -Name $Name
-                $Ns += ('Param.' + $Name)
-                $TypeName = ($CrudParam + $Name + 'Param')
-                $Implements = ('I' + $TypeName)
-                $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Param.' + $Name)
-    }
-    else {
-        Push-And-Ensure -Name 'Model'
-            $Ns += 'Model'
-    }
-
-    $File = ($TypeName + '.cs')
-    if (-not (Test-Path -Path $File)) {
-
-        $t = [char]9
-        ('using ' + $Using + ';') | Out-File -FilePath $File
-        ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
-        if ($NoId -eq $false) {
-            ($t + $t + 'public int Id { get; init; }') | Out-File -FilePath $File -Append
-        }
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
-
-        Write-ToDo -Item ('Define the ' + $TypeName + ' class')
-    }
-
-    Pop-Location
-    if ($CrudParam) {
-        Pop-Location
-    }
-}
 
 function Write-Dbo-Class {
     param (
@@ -583,69 +495,6 @@ function Write-WebApi-Controller {
             ($t + '}') | Out-File -FilePath $File -Append
         ('}') | Out-File -FilePath $File -Append
     }
-}
-
-function Write-Api-IoC {
-    param (
-        $Ns,
-        $Tier,
-        $Type,
-        [switch] $UseHttp
-    )
-
-    $Ns = Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services')
-    
-    Push-And-Ensure 'Services'
-
-        $t = [char]9
-    
-        $File = Join-Path -Path (Get-Location) -ChildPath 'IoCConf.cs'
-        if (-not (Test-Path -Path $File -PathType Leaf))
-        {
-            ('using Microsoft.Extensions.Configuration;') | Out-File -FilePath $File
-            ('using Microsoft.Extensions.DependencyInjection;') | Out-File -FilePath $File -Append
-            ('') | Out-File -FilePath $File -Append
-            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-            ('{') | Out-File -FilePath $File -Append
-                ($t + 'public static class IoCConf') | Out-File -FilePath $File -Append
-                ($t + '{') | Out-File -FilePath $File -Append
-                    ($t + $t + 'public static IServiceCollection Add' + $Type + $Tier + 'Services(this IServiceCollection services, IConfiguration configuration)') | Out-File -FilePath $File -Append
-                    ($t + $t + '{') | Out-File -FilePath $File -Append
-                        if ($UseHttp)
-                        {
-                            (($t + $t + $t + 'services.AddHttpClient();') | Out-File -FilePath $File -Append) | Out-File -FilePath $File -Append
-                        }
-                        (($t + $t + $t + 'services.AddApiServices();') | Out-File -FilePath $File -Append) | Out-File -FilePath $File -Append
-                        ($t + $t + $t + 'return services;') | Out-File -FilePath $File -Append
-                    ($t + $t + '}') | Out-File -FilePath $File -Append
-                ($t + '}') | Out-File -FilePath $File -Append
-            ('}') | Out-File -FilePath $File -Append
-        }
-
-        $File = Join-Path -Path (Get-Location) -ChildPath 'InternalIoCConf.cs'
-
-        $ApiNs = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Api.' + $Tier)
-        ('// Do not edit this file, it is generated every time codeascode script is run!') | Out-File -FilePath $File
-        ('// Add implemention specific services in the IoCConf file') | Out-File -FilePath $File -Append
-        ('using ' + $ApiNs + ';') | Out-File -FilePath $File -Append
-        ('using Microsoft.Extensions.DependencyInjection;') | Out-File -FilePath $File -Append
-        ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-        ('{') | Out-File -FilePath $File -Append
-            ($t + 'internal static class InternalIoCConf') | Out-File -FilePath $File -Append
-            ($t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + 'internal static IServiceCollection AddApiServices(this IServiceCollection services)') | Out-File -FilePath $File -Append
-                ($t + $t + '{') | Out-File -FilePath $File -Append
-                    foreach ($Name in $Types)
-                    {
-                        ($t + $t + $t + 'services.AddSingleton<I' + $Name + $Tier + ', ' + $Name + $Type + $Tier + '>();') | Out-File -FilePath $File -Append
-                    }
-                    ($t + $t + $t + 'return services;') | Out-File -FilePath $File -Append
-                ($t + $t + '}') | Out-File -FilePath $File -Append
-            ($t + '}') | Out-File -FilePath $File -Append
-        ('}') | Out-File -FilePath $File -Append
-
-    Pop-Location # Config
 }
 
 #
