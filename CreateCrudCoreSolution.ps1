@@ -21,17 +21,7 @@ $Types = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Types.txt')
 $FrontendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'FrontendStack.txt')
 $BackendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'BackendStack.txt')
 
-function StacksGotTire {
-    param (
-        $Tier
-    )
-    if ($FrontendStack.Contains($Tier)) {
-        return $true
-    }
-    return $BackendStack.Contains($Tier)
-}
-
-$MakeRepositorySpec = (StacksGotTire -Tier 'application-web-api') -or (StacksGotTire -Tier 'repository-sql')
+$MakeRepositorySpec = (Test-Stacks-Got-Tire -Tier 'application-web-api') -or (Test-Stacks-Got-Tire -Tier 'repository-sql')
 
 $Business = $false # read | detect later
 if ($FrontendStack.Contains('business') -or 
@@ -42,8 +32,6 @@ if ($FrontendStack.Contains('business') -or
 #
 # Functions that generate code
 #
-
-
 
 function Write-ViewModel-Interface {
     param (
@@ -432,28 +420,6 @@ function Write-Crud-Implementation {
     }
 }
 
-
-
-function Edit-ApplicationProgramFile {
-    param (
-        $Ns
-    )
-    $File = 'Program.cs'
-    $ProgramContent = Get-Content -Path $File
-    
-    ('using ' + (Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services;'))) | Out-File -FilePath $File
-    ('') | Out-File -FilePath $File -Append
-
-    foreach ($Line in $ProgramContent) {
-        $Line | Out-File -FilePath $File -Append
-        if ($Line -like '*Add services*')
-        {
-            ('') | Out-File -FilePath $File -Append
-            ('builder.Services.AddApplicationServices(builder.Configuration);') | Out-File $File -Append
-        }
-    }
-}
-
 function Write-WebApi-Controller {
     param (
         $Ns,
@@ -494,37 +460,6 @@ function Write-WebApi-Controller {
                 ($t + $t + '[HttpDelete] public async Task<IActionResult> DeleteAsync([FromQuery] Delete' + $Name + 'Param param) => Ok(await _api.DeleteAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
             ($t + '}') | Out-File -FilePath $File -Append
         ('}') | Out-File -FilePath $File -Append
-    }
-}
-
-#
-# Functions that write no code files
-#
-
-function Write-ToDo {
-    param (
-        $Item
-    )
-    
-    $File = ($SolutionsParentDir + '/' + $SolutionName + '/ToDo.md')
-    if (-not (Test-Path -Path $File)) {
-        ('# ToDo') | Out-File -FilePath $File
-        ('') | Out-File -FilePath $File -Append
-    }
-    ('- [ ] ' + $Item) | Out-File -FilePath $File -Append
-}
-
-function Write-Readme {
-    param (
-        $Header
-    )
-    $File = "README.md"
-    if (-not (Test-Path -Path $File)) {
-        ('# ' + $Header) | Out-File -FilePath $File
-        ('') | Out-File -FilePath $File -Append
-
-        $loc = Get-Location
-        Write-ToDo -Item ('Write content for the README file: ' + $loc + '\README.md')
     }
 }
 
@@ -626,7 +561,7 @@ Push-Location -Path $SolutionsParentDir
 
             Pop-Location # DomainProjectDir
 
-            if (StacksGotTire -Tier 'repository-sql') {
+            if (Test-Stacks-Got-Tire -Tier 'repository-sql') {
                 $SqlDatabaseProjDir = ($SolutionName + '.Infrastructure.Repository.Db')
                 Add-Project-And-Push-Location -Name $SqlDatabaseProjDir -Type 'classlib' -Specification -Domain -Configuration -Injection
 

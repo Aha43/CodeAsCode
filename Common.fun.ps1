@@ -20,6 +20,15 @@ function Get-Qualified-Namespace {
     return $LocalNameSpace
 }
 
+function Test-Stacks-Got-Tire {
+    param (
+        $Tier
+    )
+    if ($FrontendStack.Contains($Tier)) {
+        return $true
+    }
+    return $BackendStack.Contains($Tier)
+}
 
 function Add-Project-And-Push-Location {
     param (
@@ -96,5 +105,52 @@ function Add-Project-And-Push-Location {
             if ($Business) {
                 dotnet add reference ('../' + $SolutionName + '.Infrastructure.Business/' + $SolutionName + '.Infrastructure.Business.csproj')
             }
+        }
+    }
+
+    function Edit-ApplicationProgramFile {
+        param (
+            $Ns
+        )
+        $File = 'Program.cs'
+        $ProgramContent = Get-Content -Path $File
+        
+        ('using ' + (Get-Qualified-Namespace -LocalNameSpace ($Ns + '.Services;'))) | Out-File -FilePath $File
+        ('') | Out-File -FilePath $File -Append
+    
+        foreach ($Line in $ProgramContent) {
+            $Line | Out-File -FilePath $File -Append
+            if ($Line -like '*Add services*')
+            {
+                ('') | Out-File -FilePath $File -Append
+                ('builder.Services.AddApplicationServices(builder.Configuration);') | Out-File $File -Append
+            }
+        }
+    }
+
+    function Write-ToDo {
+        param (
+            $Item
+        )
+        
+        $File = ($SolutionsParentDir + '/' + $SolutionName + '/ToDo.md')
+        if (-not (Test-Path -Path $File)) {
+            ('# ToDo') | Out-File -FilePath $File
+            ('') | Out-File -FilePath $File -Append
+        }
+        ('- [ ] ' + $Item) | Out-File -FilePath $File -Append
+    }
+
+    function Write-Readme {
+        param (
+            $Header
+        )
+        $File = "README.md"
+        if (-not (Test-Path -Path $File)) {
+            ('# ' + $Header) | Out-File -FilePath $File
+            ('') | Out-File -FilePath $File -Append
+    
+            $loc = Get-Location
+            Write-ToDo -Item ('Write content for the README file: ' + $loc + '\README.md')
         }
     }
