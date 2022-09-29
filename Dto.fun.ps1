@@ -1,3 +1,35 @@
+
+function Write-Properties {
+    param (
+        [string]$Name,
+        [bool]$Class = $true
+    )
+
+    $SpecFile = ($Name + '.props.txt')
+    $SpecPath = Join-Path -Path $SpecDir -ChildPath $specFile
+    if (Test-Path -Path $specPath -PathType Leaf) {
+        $PropsLines = Get-Content -Path $specPath
+        foreach ($Line in $PropsLines) {
+            $Tokens = $Line.Split()
+            $IsCollection = (($Tokens.Count -gt 2) -and ($Tokens[2] -eq '*'))
+            $Code = ($t + $t + 'public ')
+            if ($IsCollection) {
+                $Code = ($Code + 'IEnumerable<' + $Tokens[0] + '>')
+            } else {
+                $Code = ($Code + $Tokens[0])
+            }
+            $Code = ($Code + ' ' + $Tokens[1] + ' { get; ')
+            if ($Class) {
+                $Code = ($Code + 'init; ')
+            }
+            $Code = ($Code + '}')
+            $Code | Out-File -FilePath $File -Append
+        }
+    }
+}
+
+
+
 function Write-Dto-Interface {
     param (
         $Name,
@@ -29,6 +61,11 @@ function Write-Dto-Interface {
         if ($NoId -eq $false) {
             ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
         }
+
+        if ((-not $CrudParam) -or (($CrudParam -eq 'Create') -or ($CrudParam -eq 'Update'))) {
+            Write-Properties -Name $Name -Class $false
+        }
+
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
 
@@ -79,6 +116,9 @@ function Write-Dto-Class {
         if ($NoId -eq $false) {
             ($t + $t + 'public int Id { get; init; }') | Out-File -FilePath $File -Append
         }
+
+        Write-Properties -Name $Name
+
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
 
