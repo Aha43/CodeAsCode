@@ -322,10 +322,10 @@ Push-Location -Path $SolutionsParentDir
                     }
 
                     foreach ($Name in $Types) {       
-                        Write-Dto-Interface -Name $Name -CrudParam 'Create'
-                        Write-Dto-Interface -Name $Name -CrudParam 'Read'
-                        Write-Dto-Interface -Name $Name -CrudParam 'Update'
-                        Write-Dto-Interface -Name $Name -CrudParam 'Delete'
+                        Write-Param-Interface -Name $Name -CrudParam 'Create'
+                        Write-Param-Interface -Name $Name -CrudParam 'Read'
+                        Write-Param-Interface -Name $Name -CrudParam 'Update'
+                        Write-Param-Interface -Name $Name -CrudParam 'Delete'
                     }
 
                 Pop-Location # Domain
@@ -382,10 +382,10 @@ Push-Location -Path $SolutionsParentDir
                     $Using = $SpecificationProjectDir + '.Domain.Param.' + $Name
                     $Ns = $DomainProjectDir + '.Param.' + $Name
                     
-                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Create'
-                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Read'
-                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Update'
-                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Delete'
+                    Write-Param-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Create'
+                    Write-Param-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Read'
+                    Write-Param-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Update'
+                    Write-Param-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Delete'
                 }
 
             Pop-Location # DomainProjectDir

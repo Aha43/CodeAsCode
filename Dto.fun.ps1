@@ -28,27 +28,17 @@ function Write-Properties {
     }
 }
 
-
-
 function Write-Dto-Interface {
     param (
-        $Name,
-        $CrudParam
+        $Name
     )
 
     $TypeName = $Name
 
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.')
-    if ($CrudParam) {
-        Push-And-Ensure -Name 'Param'
-        Push-And-Ensure -Name $Name
-        $Ns += ('Param.' + $Name)
-        $TypeName = ($CrudParam + $Name + 'Param')
-    }
-    else {
-        Push-And-Ensure -Name 'Model'
-        $Ns += 'Model'
-    }
+    
+    Push-And-Ensure -Name 'Model'
+    $Ns += 'Model'
 
     $File = ('I' + $TypeName + '.cs')
     if (-not (Test-Path -Path $File)) {
@@ -58,9 +48,7 @@ function Write-Dto-Interface {
         ($t + 'public interface I' + $TypeName) | Out-File -FilePath $File -Append
         ($t + '{') | Out-File -FilePath $File -Append
 
-        if ((-not $CrudParam) -or (($CrudParam -eq 'Create') -or ($CrudParam -eq 'Update'))) {
-            Write-Properties -Name $Name -Class $false
-        }
+        Write-Properties -Name $Name -Class $false
 
         ($t + '}') | Out-File -FilePath $File -Append 
         ('} ') | Out-File -FilePath $File -Append
@@ -69,12 +57,125 @@ function Write-Dto-Interface {
     }
 
     Pop-Location
-    if ($CrudParam) {
-        Pop-Location
-    }
 }
 
+function Write-Param-Interface {
+    param (
+        $Name,
+        $CrudParam
+    )
+
+    $TypeName = $Name
+
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.')
+    
+    Push-And-Ensure -Name 'Param'
+
+        Push-And-Ensure -Name $Name
+
+            $Ns += ('Param.' + $Name)
+            $TypeName = ($CrudParam + $Name + 'Param')
+
+            $File = ('I' + $TypeName + '.cs')
+            if (-not (Test-Path -Path $File)) {
+                $t = [char]9
+                ('namespace ' + $Ns) | Out-File -FilePath $File
+                ('{')  | Out-File -FilePath $File -Append
+                    ($t + 'public interface I' + $TypeName) | Out-File -FilePath $File -Append
+                    ($t + '{') | Out-File -FilePath $File -Append
+
+                    if (($CrudParam -eq 'Create') -or ($CrudParam -eq 'Update')) {
+                        Write-Properties -Name $Name -Class $false
+                    }
+
+                    ($t + '}') | Out-File -FilePath $File -Append 
+                ('} ') | Out-File -FilePath $File -Append
+
+                Write-ToDo -Item ('Define the ' + $TypeName + ' interface')
+            }
+
+        Pop-Location # $Name
+    
+    Pop-Location # Param
+}
+
+# function Write-Dto-Interface {
+#     param (
+#         $Name,
+#         $CrudParam
+#     )
+
+#     $TypeName = $Name
+
+#     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.')
+#     if ($CrudParam) {
+#         Push-And-Ensure -Name 'Param'
+#         Push-And-Ensure -Name $Name
+#         $Ns += ('Param.' + $Name)
+#         $TypeName = ($CrudParam + $Name + 'Param')
+#     }
+#     else {
+#         Push-And-Ensure -Name 'Model'
+#         $Ns += 'Model'
+#     }
+
+#     $File = ('I' + $TypeName + '.cs')
+#     if (-not (Test-Path -Path $File)) {
+#         $t = [char]9
+#         ('namespace ' + $Ns) | Out-File -FilePath $File
+#         ('{')  | Out-File -FilePath $File -Append
+#         ($t + 'public interface I' + $TypeName) | Out-File -FilePath $File -Append
+#         ($t + '{') | Out-File -FilePath $File -Append
+
+#         if ((-not $CrudParam) -or (($CrudParam -eq 'Create') -or ($CrudParam -eq 'Update'))) {
+#             Write-Properties -Name $Name -Class $false
+#         }
+
+#         ($t + '}') | Out-File -FilePath $File -Append 
+#         ('} ') | Out-File -FilePath $File -Append
+
+#         Write-ToDo -Item ('Define the ' + $TypeName + ' interface')
+#     }
+
 function Write-Dto-Class {
+    param (
+        $Name
+    )
+
+    $TypeName = $Name
+    $Implements = ('I' + $Name)
+    $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model')
+
+    $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Domain.')
+    
+    Push-And-Ensure -Name 'Model'
+    
+        $Ns += 'Model'
+
+        $File = ($TypeName + '.cs')
+        if (-not (Test-Path -Path $File)) {
+
+            $t = [char]9
+            ('using ' + $Using + ';') | Out-File -FilePath $File
+            ('') | Out-File -FilePath $File -Append
+            ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+            ('{')  | Out-File -FilePath $File -Append
+            ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
+            ($t + '{') | Out-File -FilePath $File -Append
+
+            Write-Properties -Name $Name
+
+            ($t + '}') | Out-File -FilePath $File -Append 
+            ('} ') | Out-File -FilePath $File -Append
+
+            Write-ToDo -Item ('Define the ' + $TypeName + ' class')
+        }
+
+    Pop-Location # Model
+    
+}
+
+function Write-Param-Class {
     param (
         $Name,
         $CrudParam
@@ -85,40 +186,88 @@ function Write-Dto-Class {
     $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model')
 
     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Domain.')
-    if ($CrudParam) {
-        Push-And-Ensure -Name 'Param'
-            Push-And-Ensure -Name $Name
-                $Ns += ('Param.' + $Name)
-                $TypeName = ($CrudParam + $Name + 'Param')
-                $Implements = ('I' + $TypeName)
-                $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Param.' + $Name)
-    }
-    else {
-        Push-And-Ensure -Name 'Model'
-            $Ns += 'Model'
-    }
+    
+    Push-And-Ensure -Name 'Param'
 
-    $File = ($TypeName + '.cs')
-    if (-not (Test-Path -Path $File)) {
+        Push-And-Ensure -Name $Name
 
-        $t = [char]9
-        ('using ' + $Using + ';') | Out-File -FilePath $File
-        ('') | Out-File -FilePath $File -Append
-        ('namespace ' + $Ns) | Out-File -FilePath $File -Append
-        ('{')  | Out-File -FilePath $File -Append
-        ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
-        ($t + '{') | Out-File -FilePath $File -Append
+            $Ns += ('Param.' + $Name)
+            $TypeName = ($CrudParam + $Name + 'Param')
+            $Implements = ('I' + $TypeName)
+            $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Param.' + $Name)
 
-        Write-Properties -Name $Name
+            $File = ($TypeName + '.cs')
+            if (-not (Test-Path -Path $File)) {
 
-        ($t + '}') | Out-File -FilePath $File -Append 
-        ('} ') | Out-File -FilePath $File -Append
+                $t = [char]9
+                ('using ' + $Using + ';') | Out-File -FilePath $File
+                ('') | Out-File -FilePath $File -Append
+                ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+                ('{')  | Out-File -FilePath $File -Append
+                ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
+                ($t + '{') | Out-File -FilePath $File -Append
 
-        Write-ToDo -Item ('Define the ' + $TypeName + ' class')
-    }
+                if (($CrudParam -eq 'Create') -or ($CrudParam -eq 'Update')) {
+                    Write-Properties -Name $Name
+                }
 
-    Pop-Location
-    if ($CrudParam) {
-        Pop-Location
-    }
+                ($t + '}') | Out-File -FilePath $File -Append 
+                ('} ') | Out-File -FilePath $File -Append
+
+                Write-ToDo -Item ('Define the ' + $TypeName + ' class')
+            }
+
+        Pop-Location # $Name
+    
+    Pop-Location # Param
 }
+
+
+# function Write-Dto-Class {
+#     param (
+#         $Name,
+#         $CrudParam
+#     )
+
+#     $TypeName = $Name
+#     $Implements = ('I' + $Name)
+#     $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Model')
+
+#     $Ns = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Domain.')
+#     if ($CrudParam) {
+#         Push-And-Ensure -Name 'Param'
+#             Push-And-Ensure -Name $Name
+#                 $Ns += ('Param.' + $Name)
+#                 $TypeName = ($CrudParam + $Name + 'Param')
+#                 $Implements = ('I' + $TypeName)
+#                 $Using = Get-Qualified-Namespace -LocalNameSpace ($SolutionName + '.Specification.Domain.Param.' + $Name)
+#     }
+#     else {
+#         Push-And-Ensure -Name 'Model'
+#             $Ns += 'Model'
+#     }
+
+#     $File = ($TypeName + '.cs')
+#     if (-not (Test-Path -Path $File)) {
+
+#         $t = [char]9
+#         ('using ' + $Using + ';') | Out-File -FilePath $File
+#         ('') | Out-File -FilePath $File -Append
+#         ('namespace ' + $Ns) | Out-File -FilePath $File -Append
+#         ('{')  | Out-File -FilePath $File -Append
+#         ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
+#         ($t + '{') | Out-File -FilePath $File -Append
+
+#         Write-Properties -Name $Name
+
+#         ($t + '}') | Out-File -FilePath $File -Append 
+#         ('} ') | Out-File -FilePath $File -Append
+
+#         Write-ToDo -Item ('Define the ' + $TypeName + ' class')
+#     }
+
+#     Pop-Location
+#     if ($CrudParam) {
+#         Pop-Location
+#     }
+# }
