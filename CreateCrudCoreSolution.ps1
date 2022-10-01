@@ -55,7 +55,6 @@ function Write-Dbo-Class {
             ('{')  | Out-File -FilePath $File -Append
             ($t + 'public class ' + $Name + 'Dbo') | Out-File -FilePath $File -Append
             ($t + '{') | Out-File -FilePath $File -Append
-            ($t + $t + 'public int Id { get; set; }') | Out-File -FilePath $File -Append
             ($t + '}') | Out-File -FilePath $File -Append 
             ('} ') | Out-File -FilePath $File -Append
 
@@ -183,6 +182,8 @@ function Write-Crud-Api-Implementation {
         $Type
     )
 
+    $JsonDataFile = (Join-Path -Path $SpecDir -ChildPath ($Name + ".data.json"))
+
     $t = [char]9
 
     $Ns = Get-Qualified-Namespace -LocalNameSpace $Ns
@@ -197,6 +198,9 @@ function Write-Crud-Api-Implementation {
         ('using ' + $RootNs + '.Specification.Api.' + $Tier +';') | Out-File -FilePath $File -Append
         ('using ' + $RootNs + '.Specification.Domain.Model;') | Out-File -FilePath $File -Append
         ('using ' + $RootNs + '.Specification.Domain.Param.' + $Name + ';') | Out-File -FilePath $File -Append
+        if (Test-Path -Path $JsonDataFile -PathType Leaf) {
+            ('using System.Text.Json;') | Out-File -FilePath $File -Append
+        }
         
         ('') | Out-File -FilePath $File -Append
         ('namespace ' + $Ns) | Out-File -FilePath $File -Append
@@ -215,11 +219,12 @@ function Write-Crud-Api-Implementation {
 
                 $JsonDataFile = (Join-Path -Path $SpecDir -ChildPath ($Name + ".data.json"))
                 if (Test-Path -Path $JsonDataFile -PathType Leaf) {
-                    ($t + $t + $t + 'using FileStream openStream = File.OpenRead("' + $JsonDataFile + '");') | Out-File -FilePath $File -Append
+                    $CodePath = $JsonDataFile.Replace('\', '\\')
+                    ($t + $t + $t + 'using FileStream openStream = File.OpenRead("' + $CodePath + '");') | Out-File -FilePath $File -Append
                     ($t + $t + $t + 'var data = await JsonSerializer.DeserializeAsync<IEnumerable<' + $Name + '>>(openStream);') | Out-File -FilePath $File -Append
                     ($t + $t + $t + 'return data;') | Out-File -FilePath $File -Append
                 } else {
-                    ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { Id = param.Id } });') | Out-File -FilePath $File -Append
+                    ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { } });') | Out-File -FilePath $File -Append
                 }
 
                 
@@ -228,13 +233,13 @@ function Write-Crud-Api-Implementation {
 
                 ($t + $t + 'public async Task<I' + $Name +'> UpdateAsync(IUpdate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { Id = param.Id });') | Out-File -FilePath $File -Append
+                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
 
                 ($t + $t + 'public async Task<I' + $Name +'> DeleteAsync(IDelete' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { Id = param.Id });') | Out-File -FilePath $File -Append
+                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
 
@@ -317,7 +322,7 @@ Push-Location -Path $SolutionsParentDir
                     }
 
                     foreach ($Name in $Types) {       
-                        Write-Dto-Interface -Name $Name -NoId -CrudParam 'Create'
+                        Write-Dto-Interface -Name $Name -CrudParam 'Create'
                         Write-Dto-Interface -Name $Name -CrudParam 'Read'
                         Write-Dto-Interface -Name $Name -CrudParam 'Update'
                         Write-Dto-Interface -Name $Name -CrudParam 'Delete'
@@ -377,7 +382,7 @@ Push-Location -Path $SolutionsParentDir
                     $Using = $SpecificationProjectDir + '.Domain.Param.' + $Name
                     $Ns = $DomainProjectDir + '.Param.' + $Name
                     
-                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Create' -NoId
+                    Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Create'
                     Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Read'
                     Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Update'
                     Write-Dto-Class -Using $Using -Ns $Ns -Name $Name -CrudParam 'Delete'

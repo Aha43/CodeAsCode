@@ -33,8 +33,7 @@ function Write-Properties {
 function Write-Dto-Interface {
     param (
         $Name,
-        $CrudParam,
-        [Switch]$NoId
+        $CrudParam
     )
 
     $TypeName = $Name
@@ -58,9 +57,6 @@ function Write-Dto-Interface {
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public interface I' + $TypeName) | Out-File -FilePath $File -Append
         ($t + '{') | Out-File -FilePath $File -Append
-        if ($NoId -eq $false) {
-            ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
-        }
 
         if ((-not $CrudParam) -or (($CrudParam -eq 'Create') -or ($CrudParam -eq 'Update'))) {
             Write-Properties -Name $Name -Class $false
@@ -81,8 +77,7 @@ function Write-Dto-Interface {
 function Write-Dto-Class {
     param (
         $Name,
-        $CrudParam,
-        [Switch]$NoId
+        $CrudParam
     )
 
     $TypeName = $Name
@@ -113,9 +108,6 @@ function Write-Dto-Class {
         ('{')  | Out-File -FilePath $File -Append
         ($t + 'public class ' + $TypeName + ' : ' + $Implements) | Out-File -FilePath $File -Append
         ($t + '{') | Out-File -FilePath $File -Append
-        if ($NoId -eq $false) {
-            ($t + $t + 'public int Id { get; init; }') | Out-File -FilePath $File -Append
-        }
 
         Write-Properties -Name $Name
 

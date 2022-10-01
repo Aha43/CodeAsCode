@@ -16,7 +16,6 @@ function Write-ViewModel-Interface {
             ('{')  | Out-File -FilePath $File -Append
             ($t + 'public interface I' + $Name + 'ViewModel') | Out-File -FilePath $File -Append
             ($t + '{') | Out-File -FilePath $File -Append
-            ($t + $t + 'int Id { get; }') | Out-File -FilePath $File -Append
             ($t + '}') | Out-File -FilePath $File -Append 
             ('} ') | Out-File -FilePath $File -Append
 
@@ -106,7 +105,6 @@ function Write-ViewModel {
                     ($t + $t + 'private readonly ' + $ModelInterface + '? _model;') | Out-File -FilePath $File -Append
                     ('') | Out-File -FilePath $File -Append
                     ($t + $t + 'public ' + $Class + '(' + $ModelInterface + '? model = null) => _model = model;') | Out-File -FilePath $File -Append
-                    ($t + $t + 'public int Id => _model?.Id ?? 0;') | Out-File -FilePath $File -Append
                     ('') | Out-File -FilePath $File -Append
                     ($t + $t + 'public static ' + $Class + ' Empty => new();') | Out-File -FilePath $File -Append
                 ($t + '}') | Out-File -FilePath $File -Append 
