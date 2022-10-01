@@ -19,7 +19,7 @@ $SolutionsParentDir = $env:codeascode_repo_dir
 
 $SpecDir = Join-Path -Path $env:codeascode_spec_dir -ChildPath $SolutionName
 
-$StemNameSpace = [Io.File]::ReadAllText((Join-Path -Path $SpecDir -ChildPath 'StemNamespace.txt').Trim())
+#$StemNameSpace = [Io.File]::ReadAllText((Join-Path -Path $SpecDir -ChildPath 'StemNamespace.txt').Trim())
 
 $Types = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Types.txt')
 $FrontendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'FrontendStack.txt')
@@ -33,7 +33,10 @@ if ($FrontendStack.Contains('business') -or
     $Business = $true
 }
 
+$Properties = @{}
+Read-Properties
 
+$StemNameSpace = Get-Property-OrEmptyString -Name StemNameSpace
 
 #
 # Script starts
