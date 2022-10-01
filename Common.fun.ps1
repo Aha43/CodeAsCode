@@ -154,3 +154,20 @@ function Add-Project-And-Push-Location {
             Write-ToDo -Item ('Write content for the README file: ' + $loc + '\README.md')
         }
     }
+
+    function Copy-JsonTestData {
+        
+        
+        Push-And-Ensure -Name 'test-data'
+            Copy-Item -Path ($SpecDir + '/*.data.json')
+        Pop-Location # test-data
+        
+        
+        # Push-And-Ensure -Name 'test-data'
+
+        #     Get-ChildItem $SpecDir -Filter '*.data.json' | ForEach-Object {
+        #         Copy-Item -Path $_.FullName -Destination 
+        #     }
+
+        # Pop-Location # test-data
+    }
