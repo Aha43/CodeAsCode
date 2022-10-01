@@ -212,7 +212,17 @@ function Write-Crud-Api-Implementation {
 
                 ($t + $t + 'public async Task<IEnumerable<I' + $Name +'>> ReadAsync(IRead' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { Id = param.Id } });') | Out-File -FilePath $File -Append
+
+                $JsonDataFile = (Join-Path -Path $SpecDir -ChildPath ($Name + ".data.json"))
+                if (Test-Path -Path $JsonDataFile -PathType Leaf) {
+                    ($t + $t + $t + 'using FileStream openStream = File.OpenRead("' + $JsonDataFile + '");') | Out-File -FilePath $File -Append
+                    ($t + $t + $t + 'var data = await JsonSerializer.DeserializeAsync<IEnumerable<' + $Name + '>>(openStream);') | Out-File -FilePath $File -Append
+                    ($t + $t + $t + 'return data;') | Out-File -FilePath $File -Append
+                } else {
+                    ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { Id = param.Id } });') | Out-File -FilePath $File -Append
+                }
+
+                
                 ($t + $t + '}') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
 
