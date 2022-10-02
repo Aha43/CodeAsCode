@@ -12,12 +12,15 @@ function Push-And-Ensure {
 
 function Get-Qualified-Namespace {
     param (
-        $LocalNameSpace
+        $LocalNamespace
     )
-    if ($StemNameSpace.Length -gt 0) {
-        return $StemNameSpace + '.' + $LocalNameSpace
+
+    $StemNamespace = $Properties.GetStemNamespace()
+
+    if ($StemNamespace.Length -gt 0) {
+        return $StemNamespace + '.' + $LocalNamespace
     }
-    return $LocalNameSpace
+    return $LocalNamespace
 }
 
 function Test-Stacks-Got-Tire {
@@ -44,6 +47,8 @@ function Add-Project-And-Push-Location {
         $ApiType
     )
 
+    $StemNamespace = $Properties.GetStemNamespace()
+
     Push-And-Ensure -Name $Name
 
         Write-Readme -Header $Name
@@ -51,7 +56,7 @@ function Add-Project-And-Push-Location {
         $ProjectFile = ($Name + ".csproj")
         if (-not (Test-Path -Path $ProjectFile -PathType Leaf)) {
             
-            $tmp = $StemNameSpace + '.' + $Name
+            $tmp = $StemNamespace + '.' + $Name
 
             if ($Type -eq 'application-blazor-server-mud')
             {
@@ -66,11 +71,11 @@ function Add-Project-And-Push-Location {
             $xml = [xml](Get-Content $ProjectFile)
             
             $NamespaceElement = $xml.CreateElement("RootNamespace");
-            $NamespaceElement.AppendChild($xml.CreateTextNode(($StemNameSpace + '.' +$Name)))
+            $NamespaceElement.AppendChild($xml.CreateTextNode(($StemNamespace + '.' +$Name)))
             $xml.Project.PropertyGroup.AppendChild($NamespaceElement)
 
             $AssemblyNameElement = $xml.CreateElement("AssemblyName")
-            $AssemblyNameElement.AppendChild($xml.CreateTextNode(($StemNameSpace + '.' +$Name)))
+            $AssemblyNameElement.AppendChild($xml.CreateTextNode(($StemNamespace + '.' +$Name)))
             $xml.Project.PropertyGroup.AppendChild($AssemblyNameElement)
     
             $location = Get-Location
@@ -156,32 +161,7 @@ function Write-Readme {
 }
 
 function Copy-JsonTestData {
-    
-    
     Push-And-Ensure -Name 'test-data'
         Copy-Item -Path ($SpecDir + '/*.data.json')
     Pop-Location # test-data
 }
-
-function Read-Properties {
-    
-    $JsonFile = ($SpecDir + '/Properties.json')
-    if (Test-Path -Path $JsonFile) {
-        [string]$Json = Get-Content -Path $JsonFile
-        (ConvertFrom-Json $json).psobject.properties | ForEach-Object { 
-            $Properties[$_.Name] = $_.Value 
-        }
-    }
-}
-
-function Get-Property-OrEmptyString {
-    param (
-        $Name
-    )
-    
-    if ($Properties.ContainsKey($Name)) {
-        return $Properties[$Name]
-    }
-    return ""
-}
-

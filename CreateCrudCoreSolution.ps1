@@ -5,6 +5,7 @@
 . ($PSScriptRoot + '/Crud.fun.ps1')
 . ($PSScriptRoot + '/Dbo.fun.ps1')
 . ($PSScriptRoot + '/WebApi.fun.ps1')
+. ($PSScriptRoot + '/Properties.class.ps1')
 
 if ($args.Count -eq 0){
     Write-Error -Message 'No solution name given as input argument' -ErrorAction Stop
@@ -33,10 +34,7 @@ if ($FrontendStack.Contains('business') -or
     $Business = $true
 }
 
-$Properties = @{}
-Read-Properties
-
-$StemNameSpace = Get-Property-OrEmptyString -Name StemNameSpace
+[ScriptProperties]$Properties = [ScriptProperties]::new(($SpecDir + '/Properties.json'))
 
 #
 # Script starts
@@ -46,13 +44,11 @@ Push-Location -Path $SolutionsParentDir
 
     Push-And-Ensure -Name $SolutionName
 
-        if (-not (Test-Path -Path '.gitignore' -PathType Leaf))
-        {
+        if (-not (Test-Path -Path '.gitignore' -PathType Leaf)) {
             dotnet new gitignore
         }
 
-        if (-not (Test-Path -Path ($SolutionName + '.sln') -PathType Leaf))
-        {
+        if (-not (Test-Path -Path ($SolutionName + '.sln') -PathType Leaf)) {
             dotnet new sln
         }
 
@@ -78,12 +74,10 @@ Push-Location -Path $SolutionsParentDir
 
                 Pop-Location # Domain
 
-                if ($Business)
-                {
+                if ($Business) {
                     Push-And-Ensure 'Business'
 
-                        foreach ($Name in $Types)
-                        {
+                        foreach ($Name in $Types) {
                             Write-ViewModel-Interface -Name $Name
                             Write-ViewController-Interfaces -Name $Name
                         }
@@ -99,13 +93,11 @@ Push-Location -Path $SolutionsParentDir
 
                     Pop-Location # Abstraction
 
-                    foreach ($Name in $Types)
-                    {
+                    foreach ($Name in $Types) {
                         Write-Crud-Api -Name $Name
                     }
 
-                    if ($MakeRepositorySpec -eq $true)
-                    {
+                    if ($MakeRepositorySpec -eq $true) {
                         Push-And-Ensure 'Repository'
 
                             foreach ($Name in $Types) {
