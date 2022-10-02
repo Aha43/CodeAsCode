@@ -85,7 +85,40 @@ function Write-Crud-Api {
             $U = 'IUpdate' + $Name + 'Param'
             $D = 'IDelete' + $Name + 'Param'
 
-            ($t + 'public interface I' + $Name + 'Api : ICrud<' + $M + ', ' + $C + ', ' + $R + ', ' + $U + ', ' + $D + '> { }') | Out-File -FilePath $File -Append
+            if ($Properties.MakeFullCrud($Name)) {
+                ($t + 'public interface I' + $Name + 'Api : ICrud<' + $M + ', ' + $C + ', ' + $R + ', ' + $U + ', ' + $D + '> { }') | Out-File -FilePath $File -Append
+            }
+            else {
+                $code = ($t + 'public interface I' + $Name + 'Api : ')
+                [bool]$First = $true
+                if ($Properties.MakeCrud($Name, 'c')) {
+                    $code = ($code + 'ICreate<' + $M + ', ' + $C + '>')
+                    $First = $false
+                }
+                if ($Properties.MakeCrud($Name, 'r')) {
+                    if ($First -eq $false) {
+                        $code = ($code + ', ')
+                    }
+                    $code = ($code + 'IRead<' + $M + ', ' + $R + '>')
+                    $First = $false
+                }
+                if ($Properties.MakeCrud($Name, 'u')) {
+                    if ($First -eq $false) {
+                        $code = ($code + ', ')
+                    }
+                    $code = ($code + 'IUpdate<' + $M + ', ' + $U + '>')
+                    $First = $false
+                }
+                if ($Properties.MakeCrud($Name, 'd')) {
+                    if ($First -eq $false) {
+                        $code = ($code + ', ')
+                    }
+                    $code = ($code + 'IDelete<' + $M + ', ' + $D + '>')
+                    $First = $false
+                }
+
+                ($code + ' { }') | Out-File -FilePath $File -Append
+            }
 
         ('}') | Out-File -FilePath $File -Append
     }
@@ -144,40 +177,47 @@ function Write-Crud-Api-Implementation {
             ($t + 'public class ' + $ClassName + ' : I' + $Name + $Tier) | Out-File -FilePath $File -Append
             ($t + '{') | Out-File -FilePath $File -Append
 
-                ($t + $t + 'public async Task<I' + $Name +'> CreateAsync(ICreate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
-                ($t + $t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
-                ($t + $t + '}') | Out-File -FilePath $File -Append
-                ('') | Out-File -FilePath $File -Append
+                if ($Properties.MakeCrud($Name, 'c')) {
+                    ($t + $t + 'public async Task<I' + $Name +'> CreateAsync(ICreate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+                        ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                }
+                
+                if ($Properties.MakeCrud($Name, 'r')) {
+                    ($t + $t + 'public async Task<IEnumerable<I' + $Name +'>> ReadAsync(IRead' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
 
-                ($t + $t + 'public async Task<IEnumerable<I' + $Name +'>> ReadAsync(IRead' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
-                ($t + $t + '{') | Out-File -FilePath $File -Append
+                        $JsonDataFile = (Join-Path -Path $SpecDir -ChildPath ($Name + ".data.json"))
+                        if (Test-Path -Path $JsonDataFile -PathType Leaf) {
+                            ($t + $t + $t + 'using FileStream openStream = File.OpenRead("' + $SrcJsonDataFile + '");') | Out-File -FilePath $File -Append
+                            ($t + $t + $t + 'var data = await JsonSerializer.DeserializeAsync<IEnumerable<' + $Name + '>>(openStream);') | Out-File -FilePath $File -Append
+                            ($t + $t + $t + 'return data;') | Out-File -FilePath $File -Append
+                        } else {
+                            ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { } });') | Out-File -FilePath $File -Append
+                        }
 
-                $JsonDataFile = (Join-Path -Path $SpecDir -ChildPath ($Name + ".data.json"))
-                if (Test-Path -Path $JsonDataFile -PathType Leaf) {
-                    #$CodePath = $JsonDataFile.Replace('\', '\\')
-                    ($t + $t + $t + 'using FileStream openStream = File.OpenRead("' + $SrcJsonDataFile + '");') | Out-File -FilePath $File -Append
-                    ($t + $t + $t + 'var data = await JsonSerializer.DeserializeAsync<IEnumerable<' + $Name + '>>(openStream);') | Out-File -FilePath $File -Append
-                    ($t + $t + $t + 'return data;') | Out-File -FilePath $File -Append
-                } else {
-                    ($t + $t + $t + 'return await Task.FromResult(new List<' + $Name + '>() { new ' + $Name + ' { } });') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append    
                 }
 
-                
-                ($t + $t + '}') | Out-File -FilePath $File -Append
-                ('') | Out-File -FilePath $File -Append
+                if ($Properties.MakeCrud($Name, 'u')) {
 
-                ($t + $t + 'public async Task<I' + $Name +'> UpdateAsync(IUpdate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
-                ($t + $t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
-                ($t + $t + '}') | Out-File -FilePath $File -Append
-                ('') | Out-File -FilePath $File -Append
+                    ($t + $t + 'public async Task<I' + $Name +'> UpdateAsync(IUpdate' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+                        ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                }
 
-                ($t + $t + 'public async Task<I' + $Name +'> DeleteAsync(IDelete' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
-                ($t + $t + '{') | Out-File -FilePath $File -Append
-                ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
-                ($t + $t + '}') | Out-File -FilePath $File -Append
-                ('') | Out-File -FilePath $File -Append
+                if ($Properties.MakeCrud($Name, 'd')) {
+                    ($t + $t + 'public async Task<I' + $Name +'> DeleteAsync(IDelete' + $Name + 'Param param, CancellationToken cancellationToken = default)') | Out-File -FilePath $File -Append
+                    ($t + $t + '{') | Out-File -FilePath $File -Append
+                        ($t + $t + $t + 'return await Task.FromResult(new ' + $Name + ' { });') | Out-File -FilePath $File -Append
+                    ($t + $t + '}') | Out-File -FilePath $File -Append
+                    ('') | Out-File -FilePath $File -Append
+                }
 
             ($t + '}') | Out-File -FilePath $File -Append
             ('') | Out-File -FilePath $File -Append

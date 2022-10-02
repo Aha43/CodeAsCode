@@ -33,10 +33,22 @@ function Write-WebApi-Controller {
                 ($t + $t + 'public ' + $ClassName + '(' + $ApiName + ' api) => _api = api;') | Out-File -FilePath $File -Append
                 ('') | Out-File -FilePath $File -Append
                 
-                ($t + $t + '[HttpPost] public async Task<IActionResult> PostAsync([FromBody] Create' + $Name + 'Param param) => Ok(await _api.CreateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-                ($t + $t + '[HttpGet] public async Task<IActionResult> GetAsync([FromQuery] Read' + $Name + 'Param param) => Ok(await _api.ReadAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-                ($t + $t + '[HttpPut] public async Task<IActionResult> PutAsync([FromBody] Update' + $Name + 'Param param) => Ok(await _api.UpdateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
-                ($t + $t + '[HttpDelete] public async Task<IActionResult> DeleteAsync([FromQuery] Delete' + $Name + 'Param param) => Ok(await _api.DeleteAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                if ($Properties.MakeCrud($Name, 'c')) {
+                    ($t + $t + '[HttpPost] public async Task<IActionResult> PostAsync([FromBody] Create' + $Name + 'Param param) => Ok(await _api.CreateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                }
+                
+                if ($Properties.MakeCrud($Name, 'r')) {
+                    ($t + $t + '[HttpGet] public async Task<IActionResult> GetAsync([FromQuery] Read' + $Name + 'Param param) => Ok(await _api.ReadAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                }
+                
+                if ($Properties.MakeCrud($Name, 'u')) {
+                    ($t + $t + '[HttpPut] public async Task<IActionResult> PutAsync([FromBody] Update' + $Name + 'Param param) => Ok(await _api.UpdateAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                }
+                
+                if ($Properties.MakeCrud($Name, 'u')) {
+                    ($t + $t + '[HttpDelete] public async Task<IActionResult> DeleteAsync([FromQuery] Delete' + $Name + 'Param param) => Ok(await _api.DeleteAsync(param).ConfigureAwait(false));') | Out-File -FilePath $File -Append
+                }
+
             ($t + '}') | Out-File -FilePath $File -Append
         ('}') | Out-File -FilePath $File -Append
     }

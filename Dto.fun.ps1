@@ -59,11 +59,44 @@ function Write-Dto-Interface {
     Pop-Location
 }
 
+function NoCrud {
+    param (
+        $Name,
+        $CrudParam
+    )
+    if ($CrudParam -eq 'Create') {
+        if (-not $Properties.MakeCrud($Name, 'c')) {
+            return $true
+        }
+    }
+    if ($CrudParam -eq 'Read') {
+        if (-not $Properties.MakeCrud($Name, 'r')) {
+            return $true
+        }
+    }
+    if ($CrudParam -eq 'Update') {
+        if (-not $Properties.MakeCrud($Name, 'u')) {
+            return $true
+        }
+    }
+    if ($CrudParam -eq 'Delete') {
+        if (-not $Properties.MakeCrud($Name, 'd')) {
+            return $true
+        }
+    }
+
+    return $false
+}
+
 function Write-Param-Interface {
     param (
         $Name,
         $CrudParam
     )
+
+    if (NoCrud -Name $Name -CrudParam $CrudParam) {
+        return
+    }
 
     $TypeName = $Name
 
@@ -142,6 +175,10 @@ function Write-Param-Class {
         $Name,
         $CrudParam
     )
+
+    if (NoCrud -Name $Name -CrudParam $CrudParam) {
+        return
+    }
 
     $TypeName = $Name
     $Implements = ('I' + $Name)

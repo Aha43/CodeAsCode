@@ -23,16 +23,6 @@ function Get-Qualified-Namespace {
     return $LocalNamespace
 }
 
-function Test-Stacks-Got-Tire {
-    param (
-        $Tier
-    )
-    if ($FrontendStack.Contains($Tier)) {
-        return $true
-    }
-    return $BackendStack.Contains($Tier)
-}
-
 function Add-Project-And-Push-Location {
     param (
         $Name,

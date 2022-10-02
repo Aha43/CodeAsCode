@@ -42,7 +42,7 @@ function Write-Business-IoC {
             ($t + '{') | Out-File -FilePath $File -Append
                 ($t + $t + 'internal static IServiceCollection AddApiServices(this IServiceCollection services)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                    foreach ($Name in $Types)
+                    foreach ($Name in $Properties.Types)
                     {
                         ($t + $t + $t + 'services.AddSingleton<I' + $Name + 'ViewController, ' + $Name + 'ViewController>();') | Out-File -FilePath $File -Append
                     }
@@ -152,7 +152,7 @@ function Write-Api-IoC {
             ($t + '{') | Out-File -FilePath $File -Append
                 ($t + $t + 'internal static IServiceCollection AddApiServices(this IServiceCollection services)') | Out-File -FilePath $File -Append
                 ($t + $t + '{') | Out-File -FilePath $File -Append
-                    foreach ($Name in $Types)
+                    foreach ($Name in $Properties.Types)
                     {
                         ($t + $t + $t + 'services.AddSingleton<I' + $Name + $Tier + ', ' + $Name + $Type + $Tier + '>();') | Out-File -FilePath $File -Append
                     }

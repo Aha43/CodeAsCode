@@ -5,7 +5,7 @@
 . ($PSScriptRoot + '/Crud.fun.ps1')
 . ($PSScriptRoot + '/Dbo.fun.ps1')
 . ($PSScriptRoot + '/WebApi.fun.ps1')
-. ($PSScriptRoot + '/Properties.class.ps1')
+. ($PSScriptRoot + '/ScriptProperties.class.ps1')
 
 if ($args.Count -eq 0){
     Write-Error -Message 'No solution name given as input argument' -ErrorAction Stop
@@ -20,21 +20,9 @@ $SolutionsParentDir = $env:codeascode_repo_dir
 
 $SpecDir = Join-Path -Path $env:codeascode_spec_dir -ChildPath $SolutionName
 
-#$StemNameSpace = [Io.File]::ReadAllText((Join-Path -Path $SpecDir -ChildPath 'StemNamespace.txt').Trim())
+#$Types = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Types.txt')
 
-$Types = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'Types.txt')
-$FrontendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'FrontendStack.txt')
-$BackendStack = Get-Content -Path (Join-Path -Path $SpecDir -ChildPath 'BackendStack.txt')
-
-$MakeRepositorySpec = (Test-Stacks-Got-Tire -Tier 'application-web-api') -or (Test-Stacks-Got-Tire -Tier 'repository-sql')
-
-$Business = $false # read | detect later
-if ($FrontendStack.Contains('business') -or 
-    $FrontendStack.Contains('application-blazor-server-mud')) {
-    $Business = $true
-}
-
-[ScriptProperties]$Properties = [ScriptProperties]::new(($SpecDir + '/Properties.json'))
+$Properties = [ScriptProperties]::new(($SpecDir + '/Properties.json'))
 
 #
 # Script starts
@@ -61,11 +49,11 @@ Push-Location -Path $SolutionsParentDir
 
                 Push-And-Ensure -Name 'Domain'
                             
-                    foreach ($Name in $Types) {
+                    foreach ($Name in $Properties.Types) {
                         Write-Dto-Interface -Name $Name
                     }
 
-                    foreach ($Name in $Types) {       
+                    foreach ($Name in $Properties.Types) {       
                         Write-Param-Interface -Name $Name -CrudParam 'Create'
                         Write-Param-Interface -Name $Name -CrudParam 'Read'
                         Write-Param-Interface -Name $Name -CrudParam 'Update'
@@ -74,10 +62,10 @@ Push-Location -Path $SolutionsParentDir
 
                 Pop-Location # Domain
 
-                if ($Business) {
+                if ($Properties.MakeBusiness()) {
                     Push-And-Ensure 'Business'
 
-                        foreach ($Name in $Types) {
+                        foreach ($Name in $Properties.Types) {
                             Write-ViewModel-Interface -Name $Name
                             Write-ViewController-Interfaces -Name $Name
                         }
@@ -93,14 +81,14 @@ Push-Location -Path $SolutionsParentDir
 
                     Pop-Location # Abstraction
 
-                    foreach ($Name in $Types) {
+                    foreach ($Name in $Properties.Types) {
                         Write-Crud-Api -Name $Name
                     }
 
-                    if ($MakeRepositorySpec -eq $true) {
+                    if ($Properties.MakeRepositorySpec() -eq $true) {
                         Push-And-Ensure 'Repository'
 
-                            foreach ($Name in $Types) {
+                            foreach ($Name in $Properties.Types) {
                                 Write-Crud-IRepository -Name $Name
                             }
 
@@ -114,11 +102,11 @@ Push-Location -Path $SolutionsParentDir
             $DomainProjectDir = ($SolutionName + '.Domain')
             Add-Project-And-Push-Location -Name $DomainProjectDir -Type 'classlib' -Specification
 
-                foreach ($Name in $Types) {
+                foreach ($Name in $Properties.Types) {
                     Write-Dto-Class -Name $Name
                 }
 
-                foreach ($Name in $Types) {
+                foreach ($Name in $Properties.Types) {
                     $Using = $SpecificationProjectDir + '.Domain.Param.' + $Name
                     $Ns = $DomainProjectDir + '.Param.' + $Name
                     
@@ -130,17 +118,17 @@ Push-Location -Path $SolutionsParentDir
 
             Pop-Location # DomainProjectDir
 
-            if (Test-Stacks-Got-Tire -Tier 'repository-sql') {
+            if ($Properties.BackendStack.Contains('repository-sql')) {
                 $SqlDatabaseProjDir = ($SolutionName + '.Infrastructure.Repository.Db')
                 Add-Project-And-Push-Location -Name $SqlDatabaseProjDir -Type 'classlib' -Specification -Domain -Configuration -Injection
 
                     dotnet add package Dapper
 
-                    foreach ($Name in $Types) {
+                    foreach ($Name in $Properties.Types) {
                         Write-Dbo-Class -Ns $SqlDatabaseProjDir -Name $Name
                     }
 
-                    foreach ($Name in $Types) {
+                    foreach ($Name in $Properties.Types) {
                         Write-Crud-Api-Implementation -Ns $SqlDatabaseProjDir -Name $Name -Tier 'Repository' -Type 'Db'
                     }
 
@@ -149,7 +137,7 @@ Push-Location -Path $SolutionsParentDir
                 Pop-Location # SqlDatabaseProjDir
             }
 
-            if ($BackendStack.Contains('application-web-api')) {
+            if ($Properties.BackendStack.Contains('application-web-api')) {
                 $WebApiProjDir = ($SolutionName + '.WebApi')
                 $ProjectExisted = (Test-Path -Path $WebApiProjDir)
                 Add-Project-And-Push-Location -Name $WebApiProjDir -Type 'webapi' -Domain -Specification -ApiTier 'Repository' -ApiType 'Db'
@@ -161,7 +149,7 @@ Push-Location -Path $SolutionsParentDir
                     }
 
                     Push-Location 'Controllers'
-                        foreach ($Name in $Types) {
+                        foreach ($Name in $Properties.Types) {
                             Write-WebApi-Controller -Ns $WebApiProjDir -Name $Name -ApiTier 'Repository' -ApiType 'Db'
                         }
                     Pop-Location       
@@ -171,7 +159,7 @@ Push-Location -Path $SolutionsParentDir
                 $WebApiClientProjDir = ($SolutionName + '.Infrastructure.Repository.WebApiClient')
                 Add-Project-And-Push-Location -Name $WebApiClientProjDir -Type 'classlib' -Specification -Domain -Configuration -Injection -HttpClient
 
-                    foreach ($Name in $Types) {
+                    foreach ($Name in $Properties.Types) {
                         Write-Crud-Api-Implementation -Ns $WebApiClientProjDir -Name $Name -Tier 'Repository' -Type 'WebApiClient' 
                     }
 
@@ -180,11 +168,11 @@ Push-Location -Path $SolutionsParentDir
                 Pop-Location # WebApiClientProjDir
             }
 
-            if ($Business) {
+            if ($Properties.MakeBusiness()) {
                 $BusinessClientProjDir = ($SolutionName + '.Infrastructure.Business')
                 Add-Project-And-Push-Location -Name $BusinessClientProjDir -Type 'classlib' -Specification -Injection -Configuration
 
-                        foreach ($Name in $Types) {
+                        foreach ($Name in $Properties.Types) {
                             Write-ViewModel -Name $Name
                             Write-ViewControllers -Name $Name
                         }
@@ -194,7 +182,8 @@ Push-Location -Path $SolutionsParentDir
                 Pop-Location # BusinessClientProjDir
             }
 
-            if ($FrontendStack.Contains('application-blazor-server-mud')) {
+            if ($Properties.FrontendStack.Contains('application-blazor-server-mud')) { 
+
                 $MudBlazorServerProjDir = ($SolutionName + '.MudBlazorServer')
                 $ProjectExisted = (Test-Path -Path $MudBlazorServerProjDir)
                 Add-Project-And-Push-Location -Name $MudBlazorServerProjDir -Type 'application-blazor-server-mud' -Specification -Business
